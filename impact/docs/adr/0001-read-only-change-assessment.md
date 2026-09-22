@@ -8,6 +8,8 @@ accepted
 
 _Amended 2026-09-22 — the empty-store line quoted in Consequences was reworded in implementation: once a failed Change Record can grade HIGH, "no historical evidence yet" became a lie, so the report names the stores consulted and their state instead. The honesty principle is unchanged._
 
+_Amended 2026-09-22 — the test plan joined the cited classes: a pre-check or rollback line citing `plan.json:items/N` counts as a citation, a fifth class beyond the four named in Consequences. The honesty principle is unchanged._
+
 ## Considered Options
 
 - **Lab-backed assessment**: the agent applies the Change in the sandbox lab, recaptures, and compares against the golden baseline, so the report carries measured deltas. Rejected for v1: it doubles the project's machinery (executor, capture orchestration, baseline comparison) before the advisory path — the report, the rubric, the stores — has proven itself, and the advisory is the platform's unclaimed moment. Adding lab execution later is additive and would be its own ADR.

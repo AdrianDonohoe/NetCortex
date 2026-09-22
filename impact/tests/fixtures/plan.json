@@ -1,0 +1,10 @@
+{
+  "items": [
+    {"name": "Ping UPF reachability", "nf": "UPF"},
+    {"name": "SMF comes up cleanly", "nf": "SMF"},
+    {"name": "AMF registration under load", "nf": "AMF"},
+    {"name": "UDM auth round trip", "nf": "UDM"},
+    {"name": "Reject rate stays zero", "nf": "UPF", "kpi": "reject count", "threshold": "<= 0"},
+    {"name": "Packet loss probe", "nf": "NSSF"}
+  ]
+}

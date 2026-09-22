@@ -65,6 +65,20 @@ class BlastResult:
     unknown_peers: int  # peers with no determinable role
     unknown_peer_pointers: tuple[str, ...] = ()  # the messages that revealed them
 
+    def proximity_of(self, role: str) -> int | None:
+        """How near the role sits to the Change: 0 the target, 1 a partner.
+
+        None when the role is not inside the blast radius — the caller's
+        excluded count. Case-insensitive, like role placement everywhere.
+        """
+        if self.target is None:
+            return None
+        if role.upper() == self.target.role.upper():
+            return 0
+        if any(nf.role.upper() == role.upper() for nf in self.affected):
+            return 1
+        return None
+
 
 @dataclass(frozen=True)
 class CaptureState:

@@ -59,6 +59,32 @@ items inside the Blast radius plus KPI watch points. The agent selects
 and prioritizes them for the change at hand; it never runs a check.
 _Avoid_: verification steps, test run
 
+**Test plan**:
+The human's structured list of checks for a proposed Change, supplied
+alongside the Change Record: named items, each optionally pinned to an
+NF. Read and prioritized only — nothing in the pipeline executes a
+check, so thresholds render verbatim and are never evaluated.
+_Avoid_: test run, verification suite
+
+**Plan item**:
+One entry of the Test plan: a name and an optional NF pin. An item
+whose NF is the Change's target sits closest; one naming a partner sits
+next; the rest are outside the Blast radius and are reported as an
+excluded count, never dropped silently.
+_Avoid_: check, test case
+
+**Watch point**:
+A Plan item carrying a KPI and a threshold. Rendered in both Pre-checks
+and Rollback criteria — the threshold is the human's, verbatim, and the
+agent never evaluates it.
+_Avoid_: alert, monitor
+
+**Proximity**:
+How close a Plan item's NF is to the Change's target: the target itself
+(distance 0) before its partners (distance 1), plan order preserved
+within each group.
+_Avoid_: relevance, priority
+
 **Risk grade**:
 One of HIGH / MEDIUM / LOW / INSUFFICIENT EVIDENCE, computed by a
 fixed rubric in code from three factors — historical evidence,

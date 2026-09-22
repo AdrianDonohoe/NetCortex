@@ -3,6 +3,7 @@
 import json
 
 from impact.capture import (
+    AffectedNF,
     BlastResult,
     CaptureState,
     Role,
@@ -32,6 +33,19 @@ def _capture(**overrides):
 
 def _msg(name, src, dst, **extra):
     return {"ts": 1.0, "name": name, "src_ip": src, "dst_ip": dst, **extra}
+
+
+def test_blast_result_proximity_is_target_partner_or_outsider():
+    result = BlastResult(
+        Role("SMF", "10.0.0.3", "n4/messages/0"),
+        (AffectedNF("UPF", "10.0.0.4", "n4/messages/0"),),
+        0,
+        (),
+    )
+    assert result.proximity_of("smf") == 0
+    assert result.proximity_of("UPF") == 1
+    assert result.proximity_of("AMF") is None
+    assert BlastResult(None, (), 0, ()).proximity_of("SMF") is None
 
 
 def test_gnb_amf_from_the_first_initial_ue_message():

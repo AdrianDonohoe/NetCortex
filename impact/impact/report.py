@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from .capture import blast_radius
+from .capture import BlastResult, blast_radius
 from .change import Change, ChangeType
 from .evidence import (
     Evidence,
@@ -20,6 +20,7 @@ from .evidence import (
     report_mentions,
     triage_episode_mentions,
 )
+from .plan import PlanItem, PlanState, PlacedItem, placed_items
 from .rubric import RiskGrade, Rubric
 from .specgraph import reference_partners, sbi_entities, service_family
 
@@ -111,6 +112,49 @@ def _reference_lines(change: Change, evidence: Evidence) -> list[str]:
     ]
 
 
+def _watch_text(item: PlanItem) -> str:
+    """A watch point's shared line shape: name with the threshold, verbatim."""
+    return f"{item.name} [{item.kpi}: {item.threshold}]"
+
+
+def _item_line(plan: PlanState, p: PlacedItem) -> str:
+    """One placed item as a claim line, citing its slot in the plan."""
+    text = _watch_text(p.item) if p.item.is_watch_point else p.item.name
+    return f"- {Claim(text, source=f'{plan.path}:items/{p.index}').render()}"
+
+
+def _precheck_lines(
+    evidence: Evidence,
+    result: BlastResult | None,
+    placed: tuple[PlacedItem, ...],
+) -> list[str]:
+    """The Recommended Pre-Checks: plan items by proximity, honestly absent.
+
+    A plan with no blast radius is named, never prioritized; a missing
+    or empty plan is named, never asserted clear.
+    """
+    plan = evidence.plan
+    if plan.path is None:
+        return [
+            f"- {Claim('None — no test plan provided.', source='no test plan input').render()}"
+        ]
+    if not plan.exists or not plan.items:
+        return [
+            f"- {Claim(f'test plan {plan.describe()}', source=str(plan.path)).render()}"
+        ]
+    if result is None or result.target is None:
+        return [
+            f"- {Claim(f'No blast radius determinable — plan items cannot be prioritized; {plan.describe()}', source=str(plan.path)).render()}"
+        ]
+    lines = [_item_line(plan, p) for p in placed]
+    excluded = len(plan.items) - len(placed)
+    if excluded:
+        lines.append(
+            f"- {Claim(f'{excluded} plan item(s) outside the blast radius or without an NF pin are not listed', source=str(plan.path)).render()}"
+        )
+    return lines
+
+
 def render_report(change: Change, rubric: Rubric, evidence: Evidence) -> str:
     """Render the Impact Report; every claim goes through Claim.render."""
     lines: list[str] = [
@@ -149,25 +193,33 @@ def render_report(change: Change, rubric: Rubric, evidence: Evidence) -> str:
             "not a network function",
             source="change record",
         ).render()
-    no_prechecks = Claim(
-        "None — no test plan provided.", source="no test plan input"
-    ).render()
-    if result is not None and result.target is not None:
-        rollback = Claim(
-            "Any regression in the capture-derived Procedures and KPIs "
-            "above during the Change",
-            source=str(evidence.capture.path),
-        ).render()
+    plan = evidence.plan
+    placed = (
+        placed_items(plan, result)
+        if result is not None and result.target is not None
+        else ()
+    )
+    precheck_lines = _precheck_lines(evidence, result, placed)
+    watch_points = [p for p in placed if p.item.is_watch_point]
+    if watch_points:
+        rollback_lines = [_item_line(plan, p) for p in watch_points]
+    elif result is not None and result.target is not None:
+        rollback_lines = [
+            f"- {Claim('Any regression in the capture-derived Procedures and KPIs above during the Change', source=str(evidence.capture.path)).render()}"
+        ]
+    elif plan.path is not None and plan.exists:
+        rollback_lines = [
+            f"- {Claim(f'None — no blast radius determinable, so no watch-point thresholds can be set; {plan.describe()}', source=str(plan.path)).render()}"
+        ]
     else:
         consulted = [
             str(state.path)
             for state in (evidence.capture, evidence.specgraph)
             if state.consulted
         ]
-        rollback = Claim(
-            "None — no KPI watch points derivable from the evidence consulted.",
-            source=", ".join(consulted) or "no capture or specgraph evidence consulted",
-        ).render()
+        rollback_lines = [
+            f"- {Claim('None — no KPI watch points derivable from the evidence consulted.', source=', '.join(consulted) or 'no capture or specgraph evidence consulted').render()}"
+        ]
     history_bullets = [
         f"- {Claim(f'Change History: {evidence.history.describe()}', source='the evidence stores').render()}",
         f"- {Claim(f'Triage Episodes: {evidence.triage_episodes.describe()}', source='the evidence stores').render()}",
@@ -237,11 +289,11 @@ def render_report(change: Change, rubric: Rubric, evidence: Evidence) -> str:
             "",
             "## Recommended Pre-Checks",
             "",
-            f"- {no_prechecks}",
+            *precheck_lines,
             "",
             "## Rollback Criteria",
             "",
-            f"- {rollback}",
+            *rollback_lines,
             "",
         ]
     )

@@ -19,6 +19,7 @@ CAPTURE = FIXTURES / "capture_n2.json"
 CAPTURE_N4 = FIXTURES / "capture_n4_only.json"
 CAPTURE_UNKNOWN = FIXTURES / "capture_unknown_peer.json"
 SPECGRAPH = FIXTURES / "specgraph.json"
+PLAN = FIXTURES / "plan.json"
 
 SECTION_HEADINGS = (
     "## CHANGE RISK: INSUFFICIENT EVIDENCE",
@@ -369,6 +370,148 @@ def test_plane_flags_without_capture_are_refused(tmp_path):
     proc = _assess(tmp_path, UPGRADE, "--capture-n4", str(n4))
     assert proc.returncode == 1
     assert "--capture" in proc.stderr
+    assert proc.stdout == ""
+
+
+def test_plan_prioritizes_prechecks_and_sets_rollback_thresholds(tmp_path):
+    proc = _assess(
+        tmp_path, UPGRADE, "--capture", str(CAPTURE), "--test-plan", str(PLAN)
+    )
+    assert proc.returncode == 0, proc.stderr
+    prechecks = proc.stdout.split("## Recommended Pre-Checks")[1].split(
+        "## Rollback Criteria"
+    )[0]
+    rollback = proc.stdout.split("## Rollback Criteria")[1]
+    assert prechecks.index("SMF comes up cleanly") < prechecks.index(
+        "Ping UPF reachability"
+    )
+    assert prechecks.index("Ping UPF reachability") < prechecks.index(
+        "AMF registration under load"
+    )
+    assert (
+        f"Reject rate stays zero [reject count: <= 0] "
+        f"[cited: {PLAN}:items/4]" in prechecks
+    )
+    assert "UDM auth round trip" not in prechecks
+    assert (
+        f"1 plan item(s) outside the blast radius or without an NF pin "
+        f"are not listed [cited: {PLAN}]" in prechecks
+    )
+    assert (
+        f"Reject rate stays zero [reject count: <= 0] "
+        f"[cited: {PLAN}:items/4]" in rollback
+    )
+    assert "Any regression in the capture-derived" not in rollback
+    _assert_marker_discipline(proc.stdout)
+
+
+def test_plan_without_watch_points_keeps_the_qualitative_rollback(tmp_path):
+    plan = tmp_path / "plan.json"
+    plan.write_text(
+        json.dumps({"items": [{"name": "Ping UPF reachability", "nf": "UPF"}]})
+    )
+    proc = _assess(
+        tmp_path, UPGRADE, "--capture", str(CAPTURE), "--test-plan", str(plan)
+    )
+    assert proc.returncode == 0, proc.stderr
+    assert f"Ping UPF reachability [cited: {plan}:items/0]" in proc.stdout
+    assert (
+        "Any regression in the capture-derived Procedures and KPIs "
+        "above during the Change" in proc.stdout
+    )
+    _assert_marker_discipline(proc.stdout)
+
+
+def test_plan_without_a_radius_names_the_plan_lists_nothing(tmp_path):
+    plan = tmp_path / "plan.json"
+    plan.write_text(
+        json.dumps({"items": [{"name": "Ping UPF reachability", "nf": "UPF"}]})
+    )
+    proc = _assess(tmp_path, UPGRADE, "--test-plan", str(plan))
+    assert proc.returncode == 0, proc.stderr
+    assert (
+        f"No blast radius determinable — plan items cannot be "
+        f"prioritized; {plan} holds 1 item [cited: {plan}]" in proc.stdout
+    )
+    assert "Ping UPF reachability" not in proc.stdout
+    assert (
+        f"None — no blast radius determinable, so no watch-point "
+        f"thresholds can be set; {plan} holds 1 item [cited: {plan}]"
+        in proc.stdout
+    )
+    _assert_marker_discipline(proc.stdout)
+
+
+def test_config_change_with_a_plan_lists_nothing(tmp_path):
+    plan = tmp_path / "plan.json"
+    plan.write_text(json.dumps({"items": [{"name": "Ping UDM", "nf": "UDM"}]}))
+    proc = _assess(tmp_path, CONFIG, "--test-plan", str(plan))
+    assert proc.returncode == 0, proc.stderr
+    assert "plan items cannot be prioritized" in proc.stdout
+    assert "Ping UDM" not in proc.stdout
+    assert (
+        f"None — no blast radius determinable, so no watch-point "
+        f"thresholds can be set; {plan} holds 1 item [cited: {plan}]"
+        in proc.stdout
+    )
+    _assert_marker_discipline(proc.stdout)
+
+
+def test_unpinned_plan_items_are_counted_not_silently_dropped(tmp_path):
+    plan = tmp_path / "plan.json"
+    plan.write_text(
+        json.dumps(
+            {
+                "items": [
+                    {
+                        "name": "No pin watch",
+                        "kpi": "latency",
+                        "threshold": "< 5ms",
+                    }
+                ]
+            }
+        )
+    )
+    proc = _assess(
+        tmp_path, UPGRADE, "--capture", str(CAPTURE), "--test-plan", str(plan)
+    )
+    assert proc.returncode == 0, proc.stderr
+    assert (
+        f"1 plan item(s) outside the blast radius or without an NF pin "
+        f"are not listed [cited: {plan}]" in proc.stdout
+    )
+    assert "No pin watch" not in proc.stdout
+    _assert_marker_discipline(proc.stdout)
+
+
+def test_missing_plan_is_named(tmp_path):
+    absent = tmp_path / "absent-plan.json"
+    proc = _assess(tmp_path, UPGRADE, "--test-plan", str(absent))
+    assert proc.returncode == 0, proc.stderr
+    assert f"test plan {absent} does not exist" in proc.stdout
+    _assert_marker_discipline(proc.stdout)
+
+
+def test_empty_plan_is_named(tmp_path):
+    plan = tmp_path / "plan.json"
+    plan.write_text(json.dumps({"items": []}))
+    proc = _assess(tmp_path, UPGRADE, "--test-plan", str(plan))
+    assert proc.returncode == 0, proc.stderr
+    assert f"test plan {plan} holds no items" in proc.stdout
+    _assert_marker_discipline(proc.stdout)
+
+
+def test_malformed_plan_is_refused_nothing_renders(tmp_path):
+    bad = tmp_path / "plan.json"
+    bad.write_text("{not json")
+    proc = _assess(tmp_path, UPGRADE, "--test-plan", str(bad))
+    assert proc.returncode == 1
+    assert "error:" in proc.stderr
+    assert proc.stdout == ""
+    bad.write_text(json.dumps({"items": [{"nf": "UPF"}]}))
+    proc = _assess(tmp_path, UPGRADE, "--test-plan", str(bad))
+    assert proc.returncode == 1
+    assert "non-empty 'name'" in proc.stderr
     assert proc.stdout == ""
 
 

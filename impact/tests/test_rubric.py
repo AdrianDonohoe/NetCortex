@@ -17,6 +17,7 @@ from impact.rubric import (
     grade,
     grade_matrix,
 )
+from impact.plan import PlanState
 from impact.specgraph import SpecGraphState
 
 HIST_FAIL, HIST_CONTACT, HIST_NONE, HIST_UNKNOWN = (
@@ -108,6 +109,7 @@ def _evidence(**overrides):
         reports=ReportsState(None, exists=False),
         capture=CaptureState(None),
         specgraph=SpecGraphState(None),
+        plan=PlanState(None),
     )
     return Evidence(**{**defaults, **overrides})
 

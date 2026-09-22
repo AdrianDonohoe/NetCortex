@@ -16,6 +16,7 @@ from pathlib import Path
 from .capture import CaptureState
 from .change import parse_change
 from .evidence import Evidence, ReportFile, ReportsState, StoreState
+from .plan import PlanState, parse_plan
 from .report import render_report
 from .rubric import grade
 from .specgraph import SpecGraphState
@@ -73,6 +74,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--specgraph",
         metavar="PATH",
         help="the cached specgraph export (the fallback when no capture locates the target; absent = not consulted)",
+    )
+    assess.add_argument(
+        "--test-plan",
+        metavar="PLAN.json",
+        help="the human's test plan, consumed and prioritized, never run (absent = not consulted)",
     )
     return parser
 
@@ -168,6 +174,17 @@ def _specgraph_state(path: str | None) -> SpecGraphState:
     )
 
 
+def _plan_state(path: str | None) -> PlanState:
+    """Load the test plan; malformed plans fail loudly like the capture."""
+    if path is None:
+        return PlanState(None)
+    plan_path = Path(path)
+    if not plan_path.exists():
+        return PlanState(str(plan_path), exists=False)
+    data = json.loads(plan_path.read_text(encoding="utf-8"))
+    return PlanState(str(plan_path), items=parse_plan(data))
+
+
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     try:
@@ -182,6 +199,7 @@ def main(argv: list[str] | None = None) -> int:
                 args.capture, args.capture_n4, args.capture_sbi
             ),
             specgraph=_specgraph_state(args.specgraph),
+            plan=_plan_state(args.test_plan),
         )
         report = render_report(change, grade(change, evidence), evidence)
     except (json.JSONDecodeError, OSError, ValueError) as exc:

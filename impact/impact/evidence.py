@@ -21,6 +21,7 @@ from dataclasses import dataclass
 
 from .capture import CaptureState
 from .change import Change, ChangeError, parse_change
+from .plan import PlanState
 from .specgraph import SpecGraphState
 
 
@@ -233,7 +234,8 @@ class Evidence:
     """The evidence the rubric is applied to.
 
     The stores' lines feed the rubric's historical assessment; the
-    capture and specgraph states feed the blast-radius assessment.
+    capture and specgraph states feed the blast-radius assessment; the
+    test plan feeds the advisory sections only, never the grade.
     """
 
     history: StoreState
@@ -242,3 +244,4 @@ class Evidence:
     reports: ReportsState
     capture: CaptureState
     specgraph: SpecGraphState
+    plan: PlanState
