@@ -126,6 +126,29 @@ class CaptureState:
         )
 
 
+def message_at(capture: CaptureState, pointer: str) -> dict | None:
+    """The message a capture pointer names: n4/messages/2 → that message.
+
+    Evidence pointers address the state's sections — flows by flow and
+    message index, n4 and sbi by message index. A pointer that does not
+    resolve is None, never a guess.
+    """
+    parts = pointer.split("/")
+    try:
+        if len(parts) == 4 and parts[0] == "flows" and parts[2] == "messages":
+            return capture.n2["flows"][int(parts[1])]["messages"][int(parts[3])]
+        if (
+            len(parts) == 3
+            and parts[0] in ("n4", "sbi")
+            and parts[1] == "messages"
+        ):
+            plane = capture.n4 if parts[0] == "n4" else capture.sbi
+            return plane["messages"][int(parts[2])]
+    except (KeyError, IndexError, TypeError, ValueError):
+        return None
+    return None
+
+
 def _sbi_role_of(message: dict) -> str | None:
     """The producer NF of an SBI service name: Nnssf_NSSelection_Get → NSSF."""
     family = (message.get("name") or "").split("_", 1)[0]

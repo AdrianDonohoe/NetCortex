@@ -18,6 +18,7 @@ REPORTS = FIXTURES / "reports"
 CAPTURE = FIXTURES / "capture_n2.json"
 CAPTURE_N4 = FIXTURES / "capture_n4_only.json"
 CAPTURE_UNKNOWN = FIXTURES / "capture_unknown_peer.json"
+CAPTURE_CRITICAL = FIXTURES / "capture_critical.json"
 SPECGRAPH = FIXTURES / "specgraph.json"
 PLAN = FIXTURES / "plan.json"
 
@@ -293,7 +294,13 @@ def test_unroleable_peer_keeps_the_radius_unknown(tmp_path):
 def test_specgraph_falls_back_when_no_capture_covers_the_network(tmp_path):
     proc = _assess(tmp_path, UPGRADE, "--specgraph", str(SPECGRAPH))
     assert proc.returncode == 0, proc.stderr
-    assert "## CHANGE RISK: INSUFFICIENT EVIDENCE" in proc.stdout
+    assert "## CHANGE RISK: HIGH" in proc.stdout
+    assert (
+        "dependency criticality: critical interface "
+        "Namf_Communication_N1N2MessageTransfer in the blast radius "
+        f"[cited: {SPECGRAPH}:message:29518:5.2.2.2.2:"
+        "Namf_Communication_N1N2MessageTransfer]" in proc.stdout
+    )
     assert (
         "blast radius: affects AMF (1 NF) per specgraph references; "
         "no capture consulted" in proc.stdout
@@ -371,6 +378,45 @@ def test_plane_flags_without_capture_are_refused(tmp_path):
     assert proc.returncode == 1
     assert "--capture" in proc.stderr
     assert proc.stdout == ""
+
+
+def test_critical_capture_grades_high_and_cites_the_messages(tmp_path):
+    proc = _assess(tmp_path, UPGRADE, "--capture", str(CAPTURE_CRITICAL))
+    assert proc.returncode == 0, proc.stderr
+    assert "## CHANGE RISK: HIGH" in proc.stdout
+    assert (
+        "dependency criticality: critical interface "
+        "Nudm_UEContextManagement, Nausf_UEAuthentication in the blast "
+        f"radius [cited: {CAPTURE_CRITICAL}:sbi/messages/2, "
+        f"{CAPTURE_CRITICAL}:sbi/messages/3]" in proc.stdout
+    )
+    assert f"- UDM [cited: {CAPTURE_CRITICAL}:sbi/messages/2]" in proc.stdout
+    assert f"- AUSF [cited: {CAPTURE_CRITICAL}:sbi/messages/3]" in proc.stdout
+    _assert_marker_discipline(proc.stdout)
+
+
+def test_quiet_evidence_grades_low(tmp_path):
+    history = tmp_path / "changes.jsonl"
+    history.write_text("")
+    triage = tmp_path / "triage.jsonl"
+    triage.write_text("")
+    dispatch = tmp_path / "dispatch.jsonl"
+    dispatch.write_text("")
+    reports = tmp_path / "reports"
+    reports.mkdir()
+    proc = _assess(
+        tmp_path,
+        UPGRADE,
+        "--history-path", str(history),
+        "--triage-episodes", str(triage),
+        "--dispatch-episodes", str(dispatch),
+        "--reports", str(reports),
+        "--capture", str(CAPTURE_N4),
+    )
+    assert proc.returncode == 0, proc.stderr
+    assert "## CHANGE RISK: LOW" in proc.stdout
+    assert "no critical interface in the blast radius" in proc.stdout
+    _assert_marker_discipline(proc.stdout)
 
 
 def test_plan_prioritizes_prechecks_and_sets_rollback_thresholds(tmp_path):

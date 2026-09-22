@@ -53,6 +53,14 @@ Never hand-maintained: a dependency store that drifts from the wire is
 not evidence.
 _Avoid_: impact scope, affected area
 
+**Critical interface**:
+SBI to UDM or AUSF (`Nudm_*`/`Nausf_*`) or the N2 control plane's SBI
+face (`Namf_Communication_N1N2MessageTransfer`). One inside the Blast
+radius makes the dependency criticality factor critical and grades the
+Change HIGH. The factor never asserts the absence of one without full
+knowledge of the radius.
+_Avoid_: sensitive interface, core dependency
+
 **Pre-checks**:
 The report's Recommended Pre-Checks section: the human's test-plan
 items inside the Blast radius plus KPI watch points. The agent selects

@@ -9,6 +9,7 @@ from impact.capture import (
     Role,
     blast_radius,
     infer_roles,
+    message_at,
 )
 from impact.change import parse_change
 from helpers import UPGRADE_JSON
@@ -75,6 +76,38 @@ def test_smf_upf_from_pfcp_association_setup():
     roles = infer_roles(capture)
     assert Role("SMF", "10.0.0.3", "n4/messages/0") in roles
     assert Role("UPF", "10.0.0.4", "n4/messages/0") in roles
+
+
+def test_message_at_resolves_capture_pointers():
+    capture = _smf_upf_capture(
+        sbi={
+            "messages": [
+                {
+                    "ts": 2.0,
+                    "src_ip": "10.0.0.2",
+                    "dst_ip": "10.0.0.3",
+                    "direction": "request",
+                    "name": "Nsmf_PDUSession_CreateSMContext",
+                }
+            ],
+            "procedures": [],
+            "unpaired_requests": 0,
+        }
+    )
+    assert message_at(capture, "n4/messages/0")["name"] == (
+        "PFCP Session Establishment Request"
+    )
+    assert message_at(capture, "sbi/messages/0")["name"] == (
+        "Nsmf_PDUSession_CreateSMContext"
+    )
+    assert message_at(capture, "flows/0/messages/0")["name"] == "InitialUEMessage"
+
+
+def test_message_at_returns_none_for_pointers_that_do_not_resolve():
+    capture = _capture()
+    assert message_at(capture, "sbi/messages/9") is None
+    assert message_at(capture, "flows/9/messages/0") is None
+    assert message_at(capture, "sbi/procedures/0") is None
 
 
 def test_sbi_producer_role_from_the_service_family():

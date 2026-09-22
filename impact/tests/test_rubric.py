@@ -4,7 +4,7 @@ import json
 
 import pytest
 
-from helpers import UPGRADE_JSON
+from helpers import CONFIG_JSON, UPGRADE_JSON
 from impact.capture import CaptureState
 from impact.change import parse_change
 from impact.evidence import Evidence, ReportFile, ReportsState, StoreState
@@ -355,3 +355,213 @@ def test_grade_target_absent_from_the_capture_falls_back():
         "affects AMF (1 NF) per specgraph references; "
         "SMF not determinable in the capture"
     )
+
+
+def test_grade_critical_interfaces_in_the_radius_grade_high():
+    change = parse_change(json.loads(UPGRADE_JSON))
+    capture = _smf_capture(
+        sbi_messages=[
+            {
+                "ts": 2.0,
+                "src_ip": "10.0.0.3",
+                "dst_ip": "10.0.0.5",
+                "direction": "request",
+                "name": "Nudm_UEContextManagement",
+            },
+            {
+                "ts": 2.1,
+                "src_ip": "10.0.0.3",
+                "dst_ip": "10.0.0.6",
+                "direction": "request",
+                "name": "Nausf_UEAuthentication",
+            },
+        ]
+    )
+    rubric = grade(change, _evidence(capture=capture))
+    assert rubric.grade is RiskGrade.HIGH
+    factor = rubric.factors[1]
+    assert factor.name == "dependency criticality"
+    assert factor.finding == (
+        "critical interface Nudm_UEContextManagement, Nausf_UEAuthentication "
+        "in the blast radius"
+    )
+    assert factor.citation == (
+        "capture.json:sbi/messages/0, capture.json:sbi/messages/1"
+    )
+
+
+def test_grade_a_quiet_radius_is_non_critical():
+    change = parse_change(json.loads(UPGRADE_JSON))
+    rubric = grade(change, _evidence(capture=_smf_capture()))
+    assert rubric.grade is RiskGrade.INSUFFICIENT_EVIDENCE
+    factor = rubric.factors[1]
+    assert factor.name == "dependency criticality"
+    assert factor.finding == "no critical interface in the blast radius"
+    assert factor.citation == "capture.json"
+
+
+def test_grade_unknown_peers_keep_criticality_unknown():
+    change = parse_change(json.loads(UPGRADE_JSON))
+    capture = _smf_capture(
+        sbi_messages=[
+            {
+                "ts": 2.0,
+                "src_ip": "10.0.0.6",
+                "dst_ip": "10.0.0.3",
+                "direction": "request",
+                "name": "Nsmf_PDUSession_CreateSMContext",
+            }
+        ]
+    )
+    rubric = grade(change, _evidence(capture=capture))
+    assert rubric.grade is RiskGrade.INSUFFICIENT_EVIDENCE
+    factor = rubric.factors[1]
+    assert factor.finding == (
+        "not determinable — 1 peer(s) with no determinable role could "
+        "hide a critical interface"
+    )
+    assert factor.citation == "capture.json:sbi/messages/0"
+
+
+def test_grade_a_critical_interface_beats_unknown_peers():
+    change = parse_change(json.loads(UPGRADE_JSON))
+    capture = _smf_capture(
+        sbi_messages=[
+            {
+                "ts": 2.0,
+                "src_ip": "10.0.0.6",
+                "dst_ip": "10.0.0.3",
+                "direction": "request",
+                "name": "Nsmf_PDUSession_CreateSMContext",
+            },
+            {
+                "ts": 2.1,
+                "src_ip": "10.0.0.3",
+                "dst_ip": "10.0.0.5",
+                "direction": "request",
+                "name": "Nudm_UEContextManagement",
+            },
+        ]
+    )
+    rubric = grade(change, _evidence(capture=capture))
+    assert rubric.grade is RiskGrade.HIGH
+    factor = rubric.factors[1]
+    assert factor.finding == (
+        "critical interface Nudm_UEContextManagement in the blast radius"
+    )
+    assert factor.citation == "capture.json:sbi/messages/1"
+
+
+def test_grade_config_criticality_names_the_config_key():
+    change = parse_change(json.loads(CONFIG_JSON))
+    rubric = grade(change, _evidence())
+    factor = rubric.factors[1]
+    assert factor.finding == (
+        "not determinable — the Change names a config key, "
+        "not a network function"
+    )
+    assert factor.citation == "change record"
+
+
+def test_grade_critical_specgraph_reference_grades_high():
+    change = parse_change(json.loads(UPGRADE_JSON))
+    nsmf = {
+        "id": "message:29502:8.2.2.2.2:Nsmf_PDUSession_CreateSMContext",
+        "type": "message",
+        "spec": "29502",
+        "name": "Nsmf_PDUSession_CreateSMContext",
+        "protocol": "SBI",
+    }
+    rubric = grade(change, _evidence(specgraph=_specgraph(nsmf)))
+    assert rubric.grade is RiskGrade.HIGH
+    factor = rubric.factors[1]
+    assert factor.finding == (
+        "critical interface Namf_Communication_N1N2MessageTransfer "
+        "in the blast radius"
+    )
+    assert factor.citation == (
+        "specgraph.json:message:29518:5.2:Namf_Communication_N1N2MessageTransfer"
+    )
+
+
+def test_grade_quiet_specgraph_references_are_non_critical():
+    change = parse_change(json.loads(UPGRADE_JSON))
+    nsmf = {
+        "id": "message:29502:8.2.2.2.2:Nsmf_PDUSession_CreateSMContext",
+        "type": "message",
+        "spec": "29502",
+        "name": "Nsmf_PDUSession_CreateSMContext",
+        "protocol": "SBI",
+    }
+    nnssf = {
+        "id": "message:29531:x:Nnssf_NSSelection_Get",
+        "type": "message",
+        "spec": "29531",
+        "name": "Nnssf_NSSelection_Get",
+        "protocol": "SBI",
+    }
+    specgraph = SpecGraphState(
+        "specgraph.json",
+        entities=(nsmf, nnssf),
+        edges=({"src": nsmf["id"], "dst": nnssf["id"], "kind": "co_mentioned"},),
+    )
+    rubric = grade(change, _evidence(specgraph=specgraph))
+    assert rubric.grade is RiskGrade.INSUFFICIENT_EVIDENCE
+    factor = rubric.factors[1]
+    assert factor.finding == (
+        "no critical interface per the specgraph references; "
+        "no capture consulted"
+    )
+    assert factor.citation == (
+        "specgraph.json:message:29531:x:Nnssf_NSSelection_Get"
+    )
+
+
+def test_grade_criticality_not_determinable_without_a_radius():
+    change = parse_change(json.loads(UPGRADE_JSON))
+    rubric = grade(change, _evidence())
+    factor = rubric.factors[1]
+    assert factor.finding == (
+        "not determinable — no capture or specgraph evidence consulted"
+    )
+    assert factor.citation == "no capture or specgraph evidence consulted"
+
+
+def test_grade_target_absent_from_the_capture_keeps_criticality_not_determinable():
+    change = parse_change(json.loads(UPGRADE_JSON))
+    capture = CaptureState("capture.json", n2={"flows": [], "unassociated": []})
+    rubric = grade(change, _evidence(capture=capture))
+    factor = rubric.factors[1]
+    assert factor.finding == (
+        "not determinable — no blast radius to scan in capture.json"
+    )
+    assert factor.citation == "capture.json"
+
+
+def test_grade_a_missing_capture_keeps_criticality_not_determinable():
+    change = parse_change(json.loads(UPGRADE_JSON))
+    capture = CaptureState("absent.json", exists=False)
+    rubric = grade(change, _evidence(capture=capture))
+    factor = rubric.factors[1]
+    assert factor.finding == (
+        "not determinable — no blast radius to scan; "
+        "absent.json does not exist"
+    )
+    assert factor.citation == "absent.json"
+
+
+def test_grade_low_when_every_factor_is_determinable_and_quiet():
+    change = parse_change(json.loads(UPGRADE_JSON))
+    rubric = grade(
+        change,
+        _evidence(
+            history=StoreState("changes.jsonl"),
+            triage_episodes=StoreState("triage.jsonl"),
+            dispatch_episodes=StoreState("dispatch.jsonl"),
+            reports=ReportsState("reports"),
+            capture=_smf_capture(),
+        ),
+    )
+    assert rubric.grade is RiskGrade.LOW
+    factor = rubric.factors[1]
+    assert factor.finding == "no critical interface in the blast radius"

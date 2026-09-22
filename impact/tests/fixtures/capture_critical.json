@@ -1,0 +1,61 @@
+{
+  "kpis": {
+    "attach_time_ms": 412.3,
+    "pdu_session_time_ms": 77.4,
+    "procedure_success_rate": 1.0,
+    "procedure_successes": 5,
+    "procedure_failures": 0
+  },
+  "flows": [
+    {
+      "flow_id": 0,
+      "partial": false,
+      "messages": [
+        {"ts": 0.0, "name": "InitialUEMessage", "src_ip": "10.0.0.1", "dst_ip": "10.0.0.2"},
+        {"ts": 0.01, "name": "RegistrationRequest", "src_ip": "10.0.0.1", "dst_ip": "10.0.0.2"},
+        {"ts": 0.05, "name": "RegistrationAccept", "src_ip": "10.0.0.2", "dst_ip": "10.0.0.1"}
+      ],
+      "procedures": [
+        {"kind": "registration", "start_msg": "RegistrationRequest", "end_msg": "RegistrationAccept", "outcome": "accept", "duration_ms": 40.0}
+      ],
+      "sbi_refs": []
+    },
+    {
+      "flow_id": 1,
+      "partial": false,
+      "messages": [
+        {"ts": 0.06, "name": "ULNASTransport", "src_ip": "10.0.0.1", "dst_ip": "10.0.0.2"},
+        {"ts": 0.18, "name": "DLNASTransport", "src_ip": "10.0.0.2", "dst_ip": "10.0.0.1"}
+      ],
+      "procedures": [
+        {"kind": "pdu session establishment", "start_msg": "ULNASTransport", "end_msg": "DLNASTransport", "outcome": "accept", "duration_ms": 110.0}
+      ],
+      "sbi_refs": [0]
+    }
+  ],
+  "unassociated": [],
+  "n4": {
+    "messages": [
+      {"ts": 0.1, "name": "PFCP Association Setup Request", "src_ip": "10.0.0.3", "dst_ip": "10.0.0.4"},
+      {"ts": 0.11, "name": "PFCP Association Setup Response", "src_ip": "10.0.0.4", "dst_ip": "10.0.0.3"},
+      {"ts": 0.2, "name": "PFCP Session Establishment Request", "src_ip": "10.0.0.3", "dst_ip": "10.0.0.4"},
+      {"ts": 0.21, "name": "PFCP Session Establishment Response", "src_ip": "10.0.0.4", "dst_ip": "10.0.0.3"}
+    ],
+    "procedures": [
+      {"kind": "pfcp session establishment", "start_msg": "PFCP Session Establishment Request", "end_msg": "PFCP Session Establishment Response", "outcome": "accept", "duration_ms": 10.0, "flow_id": 1}
+    ],
+    "unpaired_requests": 0
+  },
+  "sbi": {
+    "messages": [
+      {"ts": 0.15, "src_ip": "10.0.0.2", "dst_ip": "10.0.0.3", "direction": "request", "name": "Nsmf_PDUSession_CreateSMContext", "method": "POST", "path": "/nsmf-pdusession/v1/sm-contexts"},
+      {"ts": 0.16, "src_ip": "10.0.0.3", "dst_ip": "10.0.0.2", "direction": "response", "name": "Nsmf_PDUSession_CreateSMContext", "status": 201},
+      {"ts": 0.17, "src_ip": "10.0.0.3", "dst_ip": "10.0.0.6", "direction": "request", "name": "Nudm_UEContextManagement", "method": "PUT", "path": "/nudm-uecm/v1/imsi-310150123456789/registrations/smf-registrations/pdu-session-id"},
+      {"ts": 0.19, "src_ip": "10.0.0.3", "dst_ip": "10.0.0.7", "direction": "request", "name": "Nausf_UEAuthentication", "method": "POST", "path": "/nausf-auth/v1/ue-authentications"}
+    ],
+    "procedures": [
+      {"kind": "pdu session establishment", "start_msg": "Nsmf_PDUSession_CreateSMContext", "end_msg": "Nsmf_PDUSession_CreateSMContext", "outcome": "accept", "duration_ms": 30.0, "flow_id": 1}
+    ],
+    "unpaired_requests": 0
+  }
+}
