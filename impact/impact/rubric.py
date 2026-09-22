@@ -15,7 +15,12 @@ from dataclasses import dataclass
 from enum import Enum
 
 from .change import Change
-from .evidence import Evidence
+from .evidence import (
+    Evidence,
+    dispatch_episode_mentions,
+    report_mentions,
+    triage_episode_mentions,
+)
 
 
 class RiskGrade(str, Enum):
@@ -100,41 +105,59 @@ def _assess_history(
     change: Change, evidence: Evidence
 ) -> tuple[HistoricalSignal, Factor]:
     """Failed Change Records on the target first, then Episode contact."""
+    target = change.target
     if evidence.history.path is not None and evidence.history.exists:
         for idx, entry, outcome in evidence.history.change_records():
             if (
                 entry.type is change.type
-                and entry.target == change.target
+                and entry.target == target
                 and outcome == "failed"
             ):
                 return (
                     HistoricalSignal.FAILURE_MATCH,
                     Factor(
                         "historical evidence",
-                        f"a failed Change Record on {change.target}: "
+                        f"a failed Change Record on {target}: "
                         f"{entry.describe()}",
                         f"{evidence.history.path}:{idx}",
                     ),
                 )
-    if evidence.episodes.path is not None and evidence.episodes.exists:
-        mentions = evidence.episodes.mention_lines(change.target)
-        if mentions:
-            return (
-                HistoricalSignal.CONTACT,
-                Factor(
-                    "historical evidence",
-                    f"past Episodes touch {change.target}",
-                    f"{evidence.episodes.path}:"
-                    f"{','.join(map(str, mentions))}",
-                ),
+    triage_mentions = triage_episode_mentions(
+        evidence.triage_episodes, target
+    )
+    dispatch_mentions = dispatch_episode_mentions(
+        evidence.dispatch_episodes, target
+    )
+    report_paths = report_mentions(evidence.reports, target)
+    labels = [mention.label for mention in triage_mentions + dispatch_mentions]
+    if labels or report_paths:
+        findings = []
+        if labels:
+            findings.append(f"past Episodes touch {target}: {', '.join(labels)}")
+        if report_paths:
+            findings.append(
+                f"post-incident reports mention {target}: "
+                f"{', '.join(path for path, _ in report_paths)}"
             )
-    history_checked = (
-        evidence.history.path is not None and evidence.history.exists
-    )
-    episodes_checked = (
-        evidence.episodes.path is not None and evidence.episodes.exists
-    )
-    if not history_checked and not episodes_checked:
+        citations = [
+            mention.citation
+            for mention in triage_mentions + dispatch_mentions
+        ] + [
+            f"{path}:{','.join(map(str, lines))}" for path, lines in report_paths
+        ]
+        return (
+            HistoricalSignal.CONTACT,
+            Factor(
+                "historical evidence",
+                "; ".join(findings),
+                ", ".join(citations),
+            ),
+        )
+    history_checked = evidence.history.consulted
+    triage_checked = evidence.triage_episodes.consulted
+    dispatch_checked = evidence.dispatch_episodes.consulted
+    reports_checked = evidence.reports.consulted
+    if not (history_checked or triage_checked or dispatch_checked or reports_checked):
         return (
             HistoricalSignal.UNKNOWN,
             Factor(
@@ -150,14 +173,30 @@ def _assess_history(
         sources.append(evidence.history.path)
     else:
         findings.append(f"Change History {evidence.history.describe()}")
-    if episodes_checked:
-        findings.append(f"no Episodes touch {change.target}")
-        sources.append(evidence.episodes.path)
+    if triage_checked:
+        findings.append(f"no Triage Episodes touch {target}")
+        sources.append(evidence.triage_episodes.path)
     else:
-        findings.append(f"Episodes {evidence.episodes.describe()}")
+        findings.append(
+            f"Triage Episodes {evidence.triage_episodes.describe()}"
+        )
+    if dispatch_checked:
+        findings.append(f"no Dispatch Episodes touch {target}")
+        sources.append(evidence.dispatch_episodes.path)
+    else:
+        findings.append(
+            f"Dispatch Episodes {evidence.dispatch_episodes.describe()}"
+        )
+    if reports_checked:
+        findings.append(f"no post-incident reports mention {target}")
+        sources.append(evidence.reports.path)
+    else:
+        findings.append(
+            f"Post-incident reports {evidence.reports.describe()}"
+        )
     signal = (
         HistoricalSignal.NONE
-        if history_checked and episodes_checked
+        if history_checked and triage_checked and dispatch_checked and reports_checked
         else HistoricalSignal.UNKNOWN
     )
     return (

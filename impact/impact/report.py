@@ -12,7 +12,12 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from .change import Change, ChangeType
-from .evidence import Evidence
+from .evidence import (
+    Evidence,
+    dispatch_episode_mentions,
+    report_mentions,
+    triage_episode_mentions,
+)
 from .rubric import RiskGrade, Rubric
 
 
@@ -85,12 +90,6 @@ def render_report(change: Change, rubric: Rubric, evidence: Evidence) -> str:
         "No Procedures or KPIs determinable — no capture evidence consulted.",
         source="no captures consulted",
     ).render()
-    history_line = Claim(
-        f"Historical evidence consulted: Change History "
-        f"{evidence.history.describe()}; Episode stores "
-        f"{evidence.episodes.describe()}.",
-        source="the evidence stores",
-    ).render()
     no_prechecks = Claim(
         "None — no test plan provided.", source="no test plan input"
     ).render()
@@ -98,6 +97,22 @@ def render_report(change: Change, rubric: Rubric, evidence: Evidence) -> str:
         "None — no KPI watch points determinable without capture evidence.",
         source="no captures consulted",
     ).render()
+    history_bullets = [
+        f"- {Claim(f'Change History: {evidence.history.describe()}', source='the evidence stores').render()}",
+        f"- {Claim(f'Triage Episodes: {evidence.triage_episodes.describe()}', source='the evidence stores').render()}",
+        f"- {Claim(f'Dispatch Episodes: {evidence.dispatch_episodes.describe()}', source='the evidence stores').render()}",
+        f"- {Claim(f'Post-incident reports: {evidence.reports.describe()}', source='the evidence stores').render()}",
+    ]
+    for mention in triage_episode_mentions(
+        evidence.triage_episodes, change.target
+    ) + dispatch_episode_mentions(evidence.dispatch_episodes, change.target):
+        history_bullets.append(
+            f"- {Claim(f'Episode {mention.label}: {mention.narrative}', source=mention.citation).render()}"
+        )
+    for path, mention_lines in report_mentions(evidence.reports, change.target):
+        history_bullets.append(
+            f"- {Claim(f'Post-incident report {path} mentions {change.target}', source=f'{path}:{','.join(map(str, mention_lines))}').render()}"
+        )
     lines.extend(
         [
             "",
@@ -108,7 +123,7 @@ def render_report(change: Change, rubric: Rubric, evidence: Evidence) -> str:
             "",
             "## Historical Evidence",
             "",
-            history_line,
+            *history_bullets,
             "",
             "## Recommended Pre-Checks",
             "",

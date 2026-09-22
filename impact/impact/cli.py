@@ -14,7 +14,7 @@ import sys
 from pathlib import Path
 
 from .change import ChangeError, parse_change
-from .evidence import Evidence, StoreState
+from .evidence import Evidence, ReportFile, ReportsState, StoreState
 from .report import render_report
 from .rubric import grade
 
@@ -38,9 +38,19 @@ def build_parser() -> argparse.ArgumentParser:
         help="the Change History store (absent = not consulted)",
     )
     assess.add_argument(
-        "--episodes-path",
+        "--triage-episodes",
         metavar="PATH",
-        help="an Episode store, triage's or dispatch's (absent = not consulted)",
+        help="triage's Episode store (absent = not consulted)",
+    )
+    assess.add_argument(
+        "--dispatch-episodes",
+        metavar="PATH",
+        help="dispatch's Episode store (absent = not consulted)",
+    )
+    assess.add_argument(
+        "--reports",
+        metavar="DIR",
+        help="a directory of post-incident reports (absent = not consulted)",
     )
     return parser
 
@@ -56,6 +66,27 @@ def _store_state(path: str | None) -> StoreState:
     return StoreState(path, lines)
 
 
+def _reports_state(path: str | None) -> ReportsState:
+    if path is None:
+        return ReportsState(None, exists=False)
+    directory = Path(path)
+    if not directory.exists():
+        return ReportsState(path, exists=False)
+    if not directory.is_dir():
+        return ReportsState(path, is_dir=False)
+    files: list[ReportFile] = []
+    unreadable = 0
+    for report_path in sorted(directory.rglob("*.md")):
+        try:
+            with report_path.open(encoding="utf-8") as fh:
+                lines = tuple(line.strip() for line in fh if line.strip())
+        except (OSError, UnicodeDecodeError):
+            unreadable += 1  # named in the report, never asserted clear
+            continue
+        files.append(ReportFile(str(report_path), lines))
+    return ReportsState(path, tuple(files), unreadable=unreadable)
+
+
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     try:
@@ -63,7 +94,9 @@ def main(argv: list[str] | None = None) -> int:
             change = parse_change(json.load(fh))
         evidence = Evidence(
             history=_store_state(args.history_path),
-            episodes=_store_state(args.episodes_path),
+            triage_episodes=_store_state(args.triage_episodes),
+            dispatch_episodes=_store_state(args.dispatch_episodes),
+            reports=_reports_state(args.reports),
         )
         report = render_report(change, grade(change, evidence), evidence)
     except (ChangeError, json.JSONDecodeError, OSError) as exc:

@@ -6,7 +6,7 @@ import pytest
 
 from helpers import UPGRADE_JSON
 from impact.change import parse_change
-from impact.evidence import Evidence, StoreState
+from impact.evidence import Evidence, ReportFile, ReportsState, StoreState
 from impact.rubric import (
     BlastRadius,
     Criticality,
@@ -98,6 +98,16 @@ def test_blast_from_count(n_affected, expected):
     assert blast_from_count(n_affected) is expected
 
 
+def _evidence(**overrides):
+    defaults = dict(
+        history=StoreState(None, exists=False),
+        triage_episodes=StoreState(None, exists=False),
+        dispatch_episodes=StoreState(None, exists=False),
+        reports=ReportsState(None, exists=False),
+    )
+    return Evidence(**{**defaults, **overrides})
+
+
 def test_grade_reads_a_failure_out_of_the_history_store():
     change = parse_change(json.loads(UPGRADE_JSON))
     history = StoreState(
@@ -107,8 +117,7 @@ def test_grade_reads_a_failure_out_of_the_history_store():
             '"to": "1.1"}, "outcome": "failed"}',
         ),
     )
-    evidence = Evidence(history=history, episodes=StoreState(None, exists=False))
-    rubric = grade(change, evidence)
+    rubric = grade(change, _evidence(history=history))
     assert rubric.grade is RiskGrade.HIGH
     factor = rubric.factors[0]
     assert factor.name == "historical evidence"
@@ -118,15 +127,53 @@ def test_grade_reads_a_failure_out_of_the_history_store():
 
 def test_grade_finds_nothing_in_empty_stores():
     change = parse_change(json.loads(UPGRADE_JSON))
-    evidence = Evidence(
-        history=StoreState("changes.jsonl"),
-        episodes=StoreState("episodes.jsonl"),
+    rubric = grade(
+        change,
+        _evidence(
+            history=StoreState("changes.jsonl"),
+            triage_episodes=StoreState("triage.jsonl"),
+            dispatch_episodes=StoreState("dispatch.jsonl"),
+        ),
     )
-    rubric = grade(change, evidence)
     assert rubric.grade is RiskGrade.INSUFFICIENT_EVIDENCE
     assert (
         rubric.factors[0].finding
         == "no failed Change Records in Change History; "
-        "no Episodes touch SMF"
+        "no Triage Episodes touch SMF; no Dispatch Episodes touch SMF; "
+        "Post-incident reports not consulted"
     )
-    assert rubric.factors[0].citation == "changes.jsonl, episodes.jsonl"
+    assert (
+        rubric.factors[0].citation
+        == "changes.jsonl, triage.jsonl, dispatch.jsonl"
+    )
+
+
+def test_grade_episode_contact_cites_the_episode():
+    change = parse_change(json.loads(UPGRADE_JSON))
+    triage = StoreState(
+        "triage.jsonl",
+        (
+            '{"incident_type": "sbi_nssf_reject", "narrative": "The Nnssf '
+            'rejected the NSI request during SMF selection.", '
+            '"cited_evidence": [{"message": "Nnssf_NSSelection", '
+            '"cause": null, "ts": 1.0}], "created_at": "2026-08-18T00:00:00Z"}',
+        ),
+    )
+    rubric = grade(change, _evidence(triage_episodes=triage))
+    assert rubric.grade is RiskGrade.MEDIUM
+    factor = rubric.factors[0]
+    assert "past Episodes touch SMF: record 1 (sbi_nssf_reject)" in factor.finding
+    assert factor.citation == "triage.jsonl:1"
+
+
+def test_grade_report_contact_cites_path_and_line():
+    change = parse_change(json.loads(UPGRADE_JSON))
+    reports = ReportsState(
+        "reports",
+        (ReportFile("reports/one.md", ("The SMF melted.", "## Root cause")),),
+    )
+    rubric = grade(change, _evidence(reports=reports))
+    assert rubric.grade is RiskGrade.MEDIUM
+    factor = rubric.factors[0]
+    assert "post-incident reports mention SMF: reports/one.md" in factor.finding
+    assert factor.citation == "reports/one.md:1"
