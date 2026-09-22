@@ -1,0 +1,38 @@
+{
+  "kpis": {
+    "attach_time_ms": 400.0,
+    "procedure_success_rate": 0.9,
+    "procedure_successes": 3,
+    "procedure_failures": 0
+  },
+  "flows": [
+    {
+      "flow_id": 0,
+      "partial": false,
+      "messages": [
+        {"ts": 0.0, "name": "InitialUEMessage", "src_ip": "10.0.0.1", "dst_ip": "10.0.0.2"},
+        {"ts": 0.01, "name": "RegistrationRequest", "src_ip": "10.0.0.1", "dst_ip": "10.0.0.2"}
+      ],
+      "procedures": []
+    }
+  ],
+  "unassociated": [],
+  "n4": {
+    "messages": [
+      {"ts": 0.1, "name": "PFCP Association Setup Request", "src_ip": "10.0.0.3", "dst_ip": "10.0.0.4"},
+      {"ts": 0.11, "name": "PFCP Association Setup Response", "src_ip": "10.0.0.4", "dst_ip": "10.0.0.3"},
+      {"ts": 0.2, "name": "PFCP Session Establishment Request", "src_ip": "10.0.0.3", "dst_ip": "10.0.0.4"}
+    ],
+    "procedures": [
+      {"kind": "pfcp session establishment", "start_msg": "PFCP Session Establishment Request", "end_msg": "PFCP Session Establishment Response", "outcome": "accept", "duration_ms": 10.0, "flow_id": 1}
+    ],
+    "unpaired_requests": 0
+  },
+  "sbi": {
+    "messages": [
+      {"ts": 0.3, "src_ip": "10.0.0.6", "dst_ip": "10.0.0.3", "direction": "request", "name": "Nsmf_PDUSession_CreateSMContext", "method": "POST", "path": "/nsmf-pdusession/v1/sm-contexts"}
+    ],
+    "procedures": [],
+    "unpaired_requests": 0
+  }
+}

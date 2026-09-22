@@ -5,6 +5,7 @@ import json
 import pytest
 
 from helpers import UPGRADE_JSON
+from impact.capture import CaptureState
 from impact.change import parse_change
 from impact.evidence import Evidence, ReportFile, ReportsState, StoreState
 from impact.rubric import (
@@ -16,6 +17,7 @@ from impact.rubric import (
     grade,
     grade_matrix,
 )
+from impact.specgraph import SpecGraphState
 
 HIST_FAIL, HIST_CONTACT, HIST_NONE, HIST_UNKNOWN = (
     HistoricalSignal.FAILURE_MATCH,
@@ -104,6 +106,8 @@ def _evidence(**overrides):
         triage_episodes=StoreState(None, exists=False),
         dispatch_episodes=StoreState(None, exists=False),
         reports=ReportsState(None, exists=False),
+        capture=CaptureState(None),
+        specgraph=SpecGraphState(None),
     )
     return Evidence(**{**defaults, **overrides})
 
@@ -177,3 +181,175 @@ def test_grade_report_contact_cites_path_and_line():
     factor = rubric.factors[0]
     assert "post-incident reports mention SMF: reports/one.md" in factor.finding
     assert factor.citation == "reports/one.md:1"
+
+
+def _smf_capture(path="capture.json", n4_messages=None, sbi_messages=None):
+    return CaptureState(
+        path,
+        n2={"flows": [], "unassociated": []},
+        n4={
+            "messages": n4_messages
+            or [
+                {
+                    "ts": 1.0,
+                    "name": "PFCP Association Setup Request",
+                    "src_ip": "10.0.0.3",
+                    "dst_ip": "10.0.0.4",
+                }
+            ],
+            "procedures": [],
+            "unpaired_requests": 0,
+        },
+        sbi={"messages": sbi_messages or [], "procedures": [], "unpaired_requests": 0},
+    )
+
+
+def _specgraph(nsmf):
+    namf = {
+        "id": "message:29518:5.2:Namf_Communication_N1N2MessageTransfer",
+        "type": "message",
+        "spec": "29518",
+        "name": "Namf_Communication_N1N2MessageTransfer",
+        "protocol": "SBI",
+    }
+    return SpecGraphState(
+        "specgraph.json",
+        entities=(nsmf, namf),
+        edges=({"src": nsmf["id"], "dst": namf["id"], "kind": "co_mentioned"},),
+    )
+
+
+def test_grade_derives_blast_from_the_capture():
+    change = parse_change(json.loads(UPGRADE_JSON))
+    rubric = grade(change, _evidence(capture=_smf_capture()))
+    assert rubric.grade is RiskGrade.INSUFFICIENT_EVIDENCE
+    blast = rubric.factors[2]
+    assert blast.name == "blast radius"
+    assert blast.finding == "affects UPF (1 NF)"
+    assert blast.citation == "capture.json:n4/messages/0"
+
+
+def test_grade_wide_blast_from_an_sbi_peer():
+    change = parse_change(json.loads(UPGRADE_JSON))
+    capture = _smf_capture(
+        sbi_messages=[
+            {
+                "ts": 2.0,
+                "src_ip": "10.0.0.3",
+                "dst_ip": "10.0.0.5",
+                "direction": "request",
+                "name": "Nnssf_NSSelection_Get",
+            }
+        ]
+    )
+    rubric = grade(change, _evidence(capture=capture))
+    assert rubric.grade is RiskGrade.MEDIUM  # a wide blast radius
+    blast = rubric.factors[2]
+    assert blast.finding == "affects NSSF, UPF (2 NFs)"
+
+
+def test_grade_unknown_peers_keep_the_blast_unknown():
+    change = parse_change(json.loads(UPGRADE_JSON))
+    capture = _smf_capture(
+        sbi_messages=[
+            {
+                "ts": 2.0,
+                "src_ip": "10.0.0.6",
+                "dst_ip": "10.0.0.3",
+                "direction": "request",
+                "name": "Nsmf_PDUSession_CreateSMContext",
+            }
+        ]
+    )
+    rubric = grade(change, _evidence(capture=capture))
+    assert rubric.grade is RiskGrade.INSUFFICIENT_EVIDENCE
+    blast = rubric.factors[2]
+    assert (
+        blast.finding
+        == "affects UPF (1 NF); 1 peer(s) with no determinable role"
+    )
+
+
+def test_grade_falls_back_to_the_specgraph_without_a_capture():
+    change = parse_change(json.loads(UPGRADE_JSON))
+    nsmf = {
+        "id": "message:29502:8.2.2.2.2:Nsmf_PDUSession_CreateSMContext",
+        "type": "message",
+        "spec": "29502",
+        "name": "Nsmf_PDUSession_CreateSMContext",
+        "protocol": "SBI",
+    }
+    rubric = grade(change, _evidence(specgraph=_specgraph(nsmf)))
+    blast = rubric.factors[2]
+    assert blast.finding == (
+        "affects AMF (1 NF) per specgraph references; "
+        "no capture consulted"
+    )
+    assert blast.citation == (
+        "specgraph.json:"
+        "message:29518:5.2:Namf_Communication_N1N2MessageTransfer"
+    )
+
+
+def test_grade_a_missing_capture_with_specgraph_fallback_is_named():
+    change = parse_change(json.loads(UPGRADE_JSON))
+    nsmf = {
+        "id": "message:29502:8.2.2.2.2:Nsmf_PDUSession_CreateSMContext",
+        "type": "message",
+        "spec": "29502",
+        "name": "Nsmf_PDUSession_CreateSMContext",
+        "protocol": "SBI",
+    }
+    capture = CaptureState("absent.json", exists=False)
+    rubric = grade(
+        change, _evidence(capture=capture, specgraph=_specgraph(nsmf))
+    )
+    blast = rubric.factors[2]
+    assert blast.finding == (
+        "affects AMF (1 NF) per specgraph references; "
+        "capture absent.json does not exist"
+    )
+
+
+def test_grade_blast_not_determinable_with_no_capture_or_specgraph():
+    change = parse_change(json.loads(UPGRADE_JSON))
+    rubric = grade(change, _evidence())
+    blast = rubric.factors[2]
+    assert blast.finding == (
+        "not determinable — no capture or specgraph evidence consulted"
+    )
+    assert blast.citation == "no capture or specgraph evidence consulted"
+
+
+def test_grade_a_missing_capture_is_named_never_asserted_clear():
+    change = parse_change(json.loads(UPGRADE_JSON))
+    capture = CaptureState("absent.json", exists=False)
+    rubric = grade(change, _evidence(capture=capture))
+    blast = rubric.factors[2]
+    assert blast.finding == (
+        "not determinable — SMF has no determinable partners; "
+        "absent.json does not exist"
+    )
+    assert blast.citation == "absent.json"
+
+
+def test_grade_target_absent_from_the_capture_falls_back():
+    change = parse_change(json.loads(UPGRADE_JSON))
+    nsmf = {
+        "id": "message:29502:8.2.2.2.2:Nsmf_PDUSession_CreateSMContext",
+        "type": "message",
+        "spec": "29502",
+        "name": "Nsmf_PDUSession_CreateSMContext",
+        "protocol": "SBI",
+    }
+    capture = CaptureState(
+        "capture.json", n2={"flows": [], "unassociated": []}
+    )
+    rubric = grade(
+        change, _evidence(capture=capture, specgraph=_specgraph(nsmf))
+    )
+    blast = rubric.factors[2]
+    assert blast.finding == (
+        "affects AMF (1 NF) per specgraph references; "
+        "SMF not determinable in the capture"
+    )

@@ -1,0 +1,37 @@
+{
+  "kpis": {
+    "attach_time_ms": 432.1,
+    "pdu_session_time_ms": 81.7,
+    "procedure_success_rate": 0.8,
+    "procedure_successes": 4,
+    "procedure_failures": 1
+  },
+  "flows": [
+    {
+      "flow_id": 0,
+      "partial": false,
+      "messages": [
+        {"ts": 0.0, "name": "InitialUEMessage", "src_ip": "10.0.0.1", "dst_ip": "10.0.0.2"},
+        {"ts": 0.01, "name": "RegistrationRequest", "src_ip": "10.0.0.1", "dst_ip": "10.0.0.2"},
+        {"ts": 0.05, "name": "RegistrationAccept", "src_ip": "10.0.0.2", "dst_ip": "10.0.0.1"}
+      ],
+      "procedures": [
+        {"kind": "registration", "start_msg": "RegistrationRequest", "end_msg": "RegistrationAccept", "outcome": "accept", "duration_ms": 40.0}
+      ]
+    }
+  ],
+  "unassociated": [],
+  "n4": {
+    "messages": [
+      {"ts": 0.1, "name": "PFCP Association Setup Request", "src_ip": "10.0.0.3", "dst_ip": "10.0.0.4"},
+      {"ts": 0.11, "name": "PFCP Association Setup Response", "src_ip": "10.0.0.4", "dst_ip": "10.0.0.3"},
+      {"ts": 0.2, "name": "PFCP Session Establishment Request", "src_ip": "10.0.0.3", "dst_ip": "10.0.0.4"},
+      {"ts": 0.21, "name": "PFCP Session Establishment Response", "src_ip": "10.0.0.4", "dst_ip": "10.0.0.3"}
+    ],
+    "procedures": [
+      {"kind": "pfcp session establishment", "start_msg": "PFCP Session Establishment Request", "end_msg": "PFCP Session Establishment Response", "outcome": "accept", "duration_ms": 10.0, "flow_id": 1},
+      {"kind": "pfcp session establishment", "start_msg": "PFCP Session Establishment Request", "end_msg": "PFCP Session Establishment Response", "outcome": "reject", "duration_ms": 5.0, "flow_id": 2}
+    ],
+    "unpaired_requests": 0
+  }
+}

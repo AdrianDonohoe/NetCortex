@@ -1,0 +1,51 @@
+{
+  "entities": [
+    {
+      "id": "message:29502:8.2.2.2.2:Nsmf_PDUSession_CreateSMContext",
+      "type": "message",
+      "spec": "29502",
+      "name": "Nsmf_PDUSession_CreateSMContext",
+      "clause": "8.2.2.2.2",
+      "protocol": "SBI"
+    },
+    {
+      "id": "message:29502:8.2.2.2.3:Nsmf_PDUSession_UpdateSMContext",
+      "type": "message",
+      "spec": "29502",
+      "name": "Nsmf_PDUSession_UpdateSMContext",
+      "clause": "8.2.2.2.3",
+      "protocol": "SBI"
+    },
+    {
+      "id": "message:29518:5.2.2.2.2:Namf_Communication_N1N2MessageTransfer",
+      "type": "message",
+      "spec": "29518",
+      "name": "Namf_Communication_N1N2MessageTransfer",
+      "clause": "5.2.2.2.2",
+      "protocol": "SBI"
+    },
+    {
+      "id": "clause:29502:4.3:PDU Session Establishment",
+      "type": "clause",
+      "spec": "29502",
+      "name": "PDU Session Establishment"
+    }
+  ],
+  "edges": [
+    {
+      "src": "message:29502:8.2.2.2.2:Nsmf_PDUSession_CreateSMContext",
+      "dst": "message:29518:5.2.2.2.2:Namf_Communication_N1N2MessageTransfer",
+      "kind": "co_mentioned"
+    },
+    {
+      "src": "message:29502:8.2.2.2.2:Nsmf_PDUSession_CreateSMContext",
+      "dst": "clause:29502:4.3:PDU Session Establishment",
+      "kind": "contains"
+    },
+    {
+      "src": "message:29502:8.2.2.2.3:Nsmf_PDUSession_UpdateSMContext",
+      "dst": "message:29518:5.2.2.2.2:Namf_Communication_N1N2MessageTransfer",
+      "kind": "co_mentioned"
+    }
+  ]
+}

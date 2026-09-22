@@ -19,7 +19,9 @@ import json
 import re
 from dataclasses import dataclass
 
+from .capture import CaptureState
 from .change import Change, ChangeError, parse_change
+from .specgraph import SpecGraphState
 
 
 @dataclass(frozen=True)
@@ -213,15 +215,30 @@ def report_mentions(
     return mentions
 
 
+def capture_note(capture: CaptureState, target: str) -> str:
+    """How the capture's absence is reported: named honestly, never as 'not given'.
+
+    consulted is False both when no --capture was given and when the
+    given path does not exist; the second must name the missing store.
+    """
+    if capture.consulted:
+        return f"{target} not determinable in the capture"
+    if capture.path is not None:
+        return f"capture {capture.describe()}"
+    return "no capture consulted"
+
+
 @dataclass(frozen=True)
 class Evidence:
     """The evidence the rubric is applied to.
 
-    The stores' lines feed the rubric's historical assessment; captures
-    and the test plan join with the tickets that consult them.
+    The stores' lines feed the rubric's historical assessment; the
+    capture and specgraph states feed the blast-radius assessment.
     """
 
     history: StoreState
     triage_episodes: StoreState
     dispatch_episodes: StoreState
     reports: ReportsState
+    capture: CaptureState
+    specgraph: SpecGraphState

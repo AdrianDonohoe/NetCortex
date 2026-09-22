@@ -14,13 +14,16 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import Enum
 
-from .change import Change
+from .capture import blast_radius
+from .change import Change, ChangeType
 from .evidence import (
     Evidence,
+    capture_note,
     dispatch_episode_mentions,
     report_mentions,
     triage_episode_mentions,
 )
+from .specgraph import reference_partners
 
 
 class RiskGrade(str, Enum):
@@ -205,26 +208,143 @@ def _assess_history(
     )
 
 
+def _assess_blast(
+    change: Change, evidence: Evidence
+) -> tuple[BlastRadius, Factor]:
+    """Blast radius from capture evidence, falling back to specgraph references.
+
+    The count is the target's partners only; an unroleable peer keeps
+    the count unknown — NARROW requires full knowledge. Two or more
+    known partners is WIDE whatever else the capture holds. The
+    fallback order: capture first; the target not located there →
+    specgraph; neither → honest not determinable.
+    """
+    if change.type is ChangeType.CONFIG:
+        return (
+            BlastRadius.UNKNOWN,
+            Factor(
+                "blast radius",
+                "not determinable — the Change names a config key, "
+                "not a network function",
+                "change record",
+            ),
+        )
+    result = blast_radius(change, evidence.capture)
+    if result.target is not None:
+        affected = result.affected
+        if result.unknown_peers and len(affected) < 2:
+            count = None
+        else:
+            count = len(affected)
+        blast = blast_from_count(count)
+        if affected:
+            noun = "NF" if len(affected) == 1 else "NFs"
+            finding = (
+                f"affects {', '.join(nf.role for nf in affected)} "
+                f"({len(affected)} {noun})"
+            )
+        else:
+            finding = "affects no other NF"
+        if result.unknown_peers:
+            finding += (
+                f"; {result.unknown_peers} peer(s) with no determinable role"
+            )
+        sources = [
+            f"{evidence.capture.pointer_source(result.target.evidence)}:{result.target.evidence}",
+            *(
+                f"{evidence.capture.pointer_source(nf.evidence)}:{nf.evidence}"
+                for nf in affected
+            ),
+            *(
+                f"{evidence.capture.pointer_source(pointer)}:{pointer}"
+                for pointer in result.unknown_peer_pointers
+            ),
+        ]
+        return (
+            blast,
+            Factor(
+                "blast radius",
+                finding,
+                ", ".join(dict.fromkeys(sources)),
+            ),
+        )
+    partners = reference_partners(evidence.specgraph, change.target)
+    if partners:
+        noun = "NF" if len(partners) == 1 else "NFs"
+        note = capture_note(evidence.capture, change.target)
+        citation = ", ".join(
+            f"{evidence.specgraph.path}:{id_}"
+            for partner in partners
+            for id_ in partner.evidence
+        )
+        return (
+            blast_from_count(len(partners)),
+            Factor(
+                "blast radius",
+                f"affects {', '.join(p.role for p in partners)} "
+                f"({len(partners)} {noun}) per specgraph references; {note}",
+                citation,
+            ),
+        )
+    consulted = [
+        str(state.path)
+        for state in (evidence.capture, evidence.specgraph)
+        if state.consulted
+    ]
+    missing = [
+        state.describe()
+        for state in (evidence.capture, evidence.specgraph)
+        if state.path is not None and not state.exists
+    ]
+    if consulted:
+        finding = (
+            f"not determinable — {change.target} has no determinable "
+            f"partners in {', '.join(consulted)}"
+        )
+        if missing:
+            finding += "; " + "; ".join(missing)
+        return (
+            BlastRadius.UNKNOWN,
+            Factor("blast radius", finding, ", ".join(consulted)),
+        )
+    if missing:
+        return (
+            BlastRadius.UNKNOWN,
+            Factor(
+                "blast radius",
+                f"not determinable — {change.target} has no determinable "
+                f"partners; {'; '.join(missing)}",
+                ", ".join(
+                    str(state.path)
+                    for state in (evidence.capture, evidence.specgraph)
+                    if state.path is not None
+                ),
+            ),
+        )
+    return (
+        BlastRadius.UNKNOWN,
+        Factor(
+            "blast radius",
+            "not determinable — no capture or specgraph evidence consulted",
+            "no capture or specgraph evidence consulted",
+        ),
+    )
+
+
 def grade(change: Change, evidence: Evidence) -> Rubric:
     """Grade the Change: assess the factors, then apply the matrix.
 
-    Dependency criticality and blast radius derive from captures; no
-    captures are consulted yet, so both grade as not determinable and
-    their citations say so. The tickets that consult captures extend
-    this function.
+    Dependency criticality still grades not determinable — the ticket
+    that derives it from captures follows #46.
     """
     history_signal, history_factor = _assess_history(change, evidence)
     criticality_factor = Factor(
         "dependency criticality",
         "not determinable",
-        "no capture evidence to derive dependencies from",
+        "dependency criticality is not assessed yet",
     )
-    blast_factor = Factor(
-        "blast radius",
-        "not determinable",
-        "no capture evidence to derive the affected Procedures and KPIs from",
-    )
+    blast_signal, blast_factor = _assess_blast(change, evidence)
     return Rubric(
-        grade_matrix(history_signal, Criticality.UNKNOWN, BlastRadius.UNKNOWN),
+        grade_matrix(history_signal, Criticality.UNKNOWN, blast_signal),
         (history_factor, criticality_factor, blast_factor),
     )

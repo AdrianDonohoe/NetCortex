@@ -15,6 +15,10 @@ FIXTURES = Path(__file__).parent / "fixtures"
 TRIAGE = FIXTURES / "triage_episodes.jsonl"
 DISPATCH = FIXTURES / "dispatch_episodes.jsonl"
 REPORTS = FIXTURES / "reports"
+CAPTURE = FIXTURES / "capture_n2.json"
+CAPTURE_N4 = FIXTURES / "capture_n4_only.json"
+CAPTURE_UNKNOWN = FIXTURES / "capture_unknown_peer.json"
+SPECGRAPH = FIXTURES / "specgraph.json"
 
 SECTION_HEADINGS = (
     "## CHANGE RISK: INSUFFICIENT EVIDENCE",
@@ -232,3 +236,167 @@ def test_bare_claims_are_refused():
         Claim(text="a fact", source="change record").render()
         == "a fact [cited: change record]"
     )
+
+
+def test_capture_derives_affected_nfs_with_procedures_and_kpis(tmp_path):
+    proc = _assess(tmp_path, UPGRADE, "--capture", str(CAPTURE))
+    assert proc.returncode == 0, proc.stderr
+    assert "## CHANGE RISK: MEDIUM" in proc.stdout
+    assert "affects AMF, NSSF, UPF (3 NFs)" in proc.stdout
+    assert f"- AMF [cited: {CAPTURE}:flows/0/messages/0]" in proc.stdout
+    assert f"- NSSF [cited: {CAPTURE}:sbi/messages/2]" in proc.stdout
+    assert f"- UPF [cited: {CAPTURE}:n4/messages/0]" in proc.stdout
+    assert (
+        f"Procedure pdu session establishment, outcome accept "
+        f"[cited: {CAPTURE}:sbi/procedures/0]" in proc.stdout
+    )
+    assert (
+        f"KPI procedures=3, accept=3, reject=0 [cited: {CAPTURE}:flows/0/"
+        f"procedures/0, {CAPTURE}:flows/1/procedures/0, {CAPTURE}:sbi/"
+        f"procedures/0]" in proc.stdout
+    )
+    assert (
+        f"KPI procedures=2, accept=1, reject=1 [cited: {CAPTURE}:n4/"
+        f"procedures/0, {CAPTURE}:n4/procedures/1]" in proc.stdout
+    )
+    assert (
+        f"no Procedures or KPIs derivable [cited: {CAPTURE}:sbi/messages/2]"
+        in proc.stdout
+    )
+    _assert_marker_discipline(proc.stdout)
+
+
+def test_n4_only_capture_grades_the_radius_narrow(tmp_path):
+    proc = _assess(tmp_path, UPGRADE, "--capture", str(CAPTURE_N4))
+    assert proc.returncode == 0, proc.stderr
+    assert "blast radius: affects UPF (1 NF)" in proc.stdout
+    assert "## CHANGE RISK: INSUFFICIENT EVIDENCE" in proc.stdout
+    _assert_marker_discipline(proc.stdout)
+
+
+def test_unroleable_peer_keeps_the_radius_unknown(tmp_path):
+    proc = _assess(tmp_path, UPGRADE, "--capture", str(CAPTURE_UNKNOWN))
+    assert proc.returncode == 0, proc.stderr
+    assert (
+        "blast radius: affects UPF (1 NF); 1 peer(s) with no determinable "
+        "role" in proc.stdout
+    )
+    assert (
+        f"1 peer(s) with no determinable role "
+        f"[cited: {CAPTURE_UNKNOWN}:sbi/messages/0]" in proc.stdout
+    )
+    assert "## CHANGE RISK: INSUFFICIENT EVIDENCE" in proc.stdout
+    _assert_marker_discipline(proc.stdout)
+
+
+def test_specgraph_falls_back_when_no_capture_covers_the_network(tmp_path):
+    proc = _assess(tmp_path, UPGRADE, "--specgraph", str(SPECGRAPH))
+    assert proc.returncode == 0, proc.stderr
+    assert "## CHANGE RISK: INSUFFICIENT EVIDENCE" in proc.stdout
+    assert (
+        "blast radius: affects AMF (1 NF) per specgraph references; "
+        "no capture consulted" in proc.stdout
+    )
+    assert f"no capture consulted; specgraph reference points [cited: {SPECGRAPH}]" in proc.stdout
+    assert (
+        f"Service operation Nsmf_PDUSession_CreateSMContext "
+        f"[cited: {SPECGRAPH}:message:29502:8.2.2.2.2:Nsmf_"
+        f"PDUSession_CreateSMContext]" in proc.stdout
+    )
+    assert (
+        f"AMF — reference dependency [cited: {SPECGRAPH}:"
+        f"message:29518:5.2.2.2.2:Namf_Communication_N1N2MessageTransfer]"
+        in proc.stdout
+    )
+    assert (
+        f"None — no KPI watch points derivable from the evidence "
+        f"consulted. [cited: {SPECGRAPH}]" in proc.stdout
+    )
+    _assert_marker_discipline(proc.stdout)
+
+
+def test_missing_capture_with_specgraph_names_the_capture(tmp_path):
+    absent = tmp_path / "absent.json"
+    proc = _assess(
+        tmp_path, UPGRADE, "--capture", str(absent), "--specgraph", str(SPECGRAPH)
+    )
+    assert proc.returncode == 0, proc.stderr
+    assert (
+        "blast radius: affects AMF (1 NF) per specgraph references; "
+        f"capture {absent} does not exist" in proc.stdout
+    )
+    assert (
+        f"capture {absent} does not exist; specgraph reference points"
+        in proc.stdout
+    )
+    assert "no capture consulted" not in proc.stdout
+    _assert_marker_discipline(proc.stdout)
+
+
+def test_target_absent_from_the_capture_falls_back_to_the_specgraph(tmp_path):
+    capture = tmp_path / "n2.json"
+    capture.write_text(json.dumps({"flows": [], "unassociated": []}))
+    proc = _assess(
+        tmp_path, UPGRADE, "--capture", str(capture), "--specgraph", str(SPECGRAPH)
+    )
+    assert proc.returncode == 0, proc.stderr
+    assert "SMF not determinable in the capture" in proc.stdout
+    assert "AMF — reference dependency" in proc.stdout
+    _assert_marker_discipline(proc.stdout)
+
+
+def test_malformed_capture_is_refused_nothing_renders(tmp_path):
+    capture = tmp_path / "bad.json"
+    capture.write_text("{not json")
+    proc = _assess(tmp_path, UPGRADE, "--capture", str(capture))
+    assert proc.returncode == 1
+    assert "error:" in proc.stderr
+    assert proc.stdout == ""
+
+
+def test_missing_capture_is_named_never_asserted_clear(tmp_path):
+    absent = tmp_path / "absent.json"
+    proc = _assess(tmp_path, UPGRADE, "--capture", str(absent))
+    assert proc.returncode == 0, proc.stderr
+    assert f"{absent} does not exist" in proc.stdout
+    assert "## CHANGE RISK: INSUFFICIENT EVIDENCE" in proc.stdout
+    _assert_marker_discipline(proc.stdout)
+
+
+def test_plane_flags_without_capture_are_refused(tmp_path):
+    n4 = tmp_path / "n4.json"
+    n4.write_text(json.dumps({"messages": [], "procedures": [], "unpaired_requests": 0}))
+    proc = _assess(tmp_path, UPGRADE, "--capture-n4", str(n4))
+    assert proc.returncode == 1
+    assert "--capture" in proc.stderr
+    assert proc.stdout == ""
+
+
+def test_separate_plane_exports_load_and_cite_their_own_file(tmp_path):
+    n2 = tmp_path / "n2.json"
+    n2.write_text(json.dumps({"flows": [], "unassociated": []}))
+    n4 = tmp_path / "n4.json"
+    n4.write_text(
+        json.dumps(
+            {
+                "messages": [
+                    {
+                        "ts": 1.0,
+                        "name": "PFCP Association Setup Request",
+                        "src_ip": "10.0.0.3",
+                        "dst_ip": "10.0.0.4",
+                    }
+                ],
+                "procedures": [],
+                "unpaired_requests": 0,
+            }
+        )
+    )
+    proc = _assess(
+        tmp_path, UPGRADE, "--capture", str(n2), "--capture-n4", str(n4)
+    )
+    assert proc.returncode == 0, proc.stderr
+    assert "blast radius: affects UPF (1 NF)" in proc.stdout
+    assert f"- UPF [cited: {n4}:n4/messages/0]" in proc.stdout
+    assert f"{n2}:n4/messages/0" not in proc.stdout
+    _assert_marker_discipline(proc.stdout)
