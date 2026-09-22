@@ -6,6 +6,8 @@ The Change Impact Agent answers the platform's third question: triage asks *what
 
 accepted
 
+_Amended 2026-09-22 — the empty-store line quoted in Consequences was reworded in implementation: once a failed Change Record can grade HIGH, "no historical evidence yet" became a lie, so the report names the stores consulted and their state instead. The honesty principle is unchanged._
+
 ## Considered Options
 
 - **Lab-backed assessment**: the agent applies the Change in the sandbox lab, recaptures, and compares against the golden baseline, so the report carries measured deltas. Rejected for v1: it doubles the project's machinery (executor, capture orchestration, baseline comparison) before the advisory path — the report, the rubric, the stores — has proven itself, and the advisory is the platform's unclaimed moment. Adding lab execution later is additive and would be its own ADR.
@@ -15,5 +17,5 @@ accepted
 
 - **Pre-checks are pointers, not runs.** The report recommends which of the human's test-plan items matter for this change and which KPIs to watch; it never executes a check. The human owns the measurement.
 - **The predicted-vs-cited discipline is load-bearing.** With no lab, every claim in the report must be marked as a prediction or a citation (an Episode, a Change Record, a capture, a spec reference). An unmarked claim would pass a guess off as evidence.
-- **The first reports are honest about emptiness.** The Change History starts empty and grows only through the human annotation loop, so "no historical evidence yet" is a normal, truthful line — the same empty-store honesty as dispatch's runbook library.
+- **The first reports are honest about emptiness.** The Change History starts empty and grows only through the human annotation loop, so a line naming the stores consulted and what they hold — "is empty", "does not exist" — is normal, truthful output: the same empty-store honesty as dispatch's runbook library.
 - **Adding the lab later is additive, not a rewrite.** The report schema, the rubric, and the stores don't change if a lab-backed executor arrives; a measured-delta section joins the report and the read-only boundary moves to "never outside the lab" — which is exactly dispatch's existing stance.

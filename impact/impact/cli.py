@@ -47,13 +47,13 @@ def build_parser() -> argparse.ArgumentParser:
 
 def _store_state(path: str | None) -> StoreState:
     if path is None:
-        return StoreState(None, 0, exists=False)
+        return StoreState(None, exists=False)
     store = Path(path)
     if not store.exists():
-        return StoreState(path, 0, exists=False)
+        return StoreState(path, exists=False)
     with store.open(encoding="utf-8") as fh:
-        entries = sum(1 for line in fh if line.strip())
-    return StoreState(path, entries)
+        lines = tuple(line.strip() for line in fh if line.strip())
+    return StoreState(path, lines)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -65,13 +65,7 @@ def main(argv: list[str] | None = None) -> int:
             history=_store_state(args.history_path),
             episodes=_store_state(args.episodes_path),
         )
-        report = render_report(change, grade(evidence), evidence)
-    except NotImplementedError:
-        print(
-            "error: this evidence set is not yet supported by the rubric",
-            file=sys.stderr,
-        )
-        return 1
+        report = render_report(change, grade(change, evidence), evidence)
     except (ChangeError, json.JSONDecodeError, OSError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1

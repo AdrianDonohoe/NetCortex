@@ -86,10 +86,10 @@ def render_report(change: Change, rubric: Rubric, evidence: Evidence) -> str:
         source="no captures consulted",
     ).render()
     history_line = Claim(
-        f"No historical evidence yet — Change History "
+        f"Historical evidence consulted: Change History "
         f"{evidence.history.describe()}; Episode stores "
         f"{evidence.episodes.describe()}.",
-        source="the evidence stores hold nothing",
+        source="the evidence stores",
     ).render()
     no_prechecks = Claim(
         "None — no test plan provided.", source="no test plan input"

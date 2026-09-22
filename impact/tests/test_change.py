@@ -4,10 +4,8 @@ import json
 
 import pytest
 
+from helpers import CONFIG_JSON, UPGRADE_JSON
 from impact.change import Change, ChangeError, ChangeType, parse_change
-
-UPGRADE_JSON = '{"type": "upgrade", "nf": "SMF", "from": "2.4.1", "to": "2.4.2"}'
-CONFIG_JSON = '{"type": "config", "key": "udm.sbi.uri", "from": "udm-1", "to": "udm-2"}'
 
 
 def test_upgrade_parses():
