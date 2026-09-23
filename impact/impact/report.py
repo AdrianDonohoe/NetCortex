@@ -4,7 +4,9 @@ Every claim line carries exactly one marker — [cited] with a source, or
 [predicted] — and the renderer refuses to emit a bare claim: the
 assembled report is validated before it leaves. With no lab,
 prediction must never read as measurement. Section headings are
-structure, not claims, and are exempt from marking.
+structure, not claims, and are exempt from marking — as is the
+human's outcome annotation appended by the annotation loop: it is
+the human's record, not the agent's claim.
 """
 
 from __future__ import annotations

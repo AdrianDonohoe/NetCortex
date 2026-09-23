@@ -20,6 +20,13 @@ class ChangeType(str, Enum):
     CONFIG = "config"
 
 
+# The human's Outcome vocabulary on a Change Record.
+OUTCOMES = ("applied", "rejected", "rolled-back")
+
+# The outcomes that read as failures to the historical-evidence factor.
+FAILED_OUTCOMES = ("rejected", "rolled-back")
+
+
 @dataclass(frozen=True)
 class Change:
     type: ChangeType
@@ -42,7 +49,7 @@ def parse_change(data: object) -> Change:
             f"unknown change type {data.get('type')!r} "
             f"(expected 'upgrade' or 'config')"
         ) from None
-    label = "nf" if ctype is ChangeType.UPGRADE else "key"
+    label = _target_label(ctype)
     target = data.get(label)
     if not isinstance(target, str) or not target:
         raise ChangeError(f"a {ctype.value} Change needs a non-empty {label!r} field")
@@ -53,3 +60,18 @@ def parse_change(data: object) -> Change:
     if not isinstance(after, str) or not after:
         raise ChangeError("a Change needs a non-empty 'to' field")
     return Change(type=ctype, target=target, before=before, after=after)
+
+
+def _target_label(ctype: ChangeType) -> str:
+    """The field that carries the target: nf for upgrades, key for configs."""
+    return "nf" if ctype is ChangeType.UPGRADE else "key"
+
+
+def to_record(change: Change) -> dict:
+    """The Change's stored form — the shape parse_change reads back."""
+    return {
+        "type": change.type.value,
+        _target_label(change.type): change.target,
+        "from": change.before,
+        "to": change.after,
+    }

@@ -1,9 +1,12 @@
-"""impact CLI: assess a proposed Change and write an Impact Report.
+"""impact CLI: assess a proposed Change, and the human annotation loop.
 
-Read-only by design: nothing here applies anything, not even in the
-sandbox lab. The report is the deliverable; a human decides and
-applies. Exit codes: 0 on success, 1 on any input or evidence error,
-with the error named on stderr.
+assess is read-only by design: nothing in it applies anything, not
+even in the sandbox lab. The report is the deliverable; a human
+decides and applies. annotate is the human's loop alone: it records
+the outcome onto the report and appends the Change Record — the
+agent never writes its own history. Exit codes: 0 on success, 2 on a
+usage error (argparse), 1 on any input or evidence error, with the
+error named on stderr.
 """
 
 from __future__ import annotations
@@ -14,7 +17,7 @@ import sys
 from pathlib import Path
 
 from .capture import CaptureState
-from .change import parse_change
+from .change import OUTCOMES, parse_change, to_record
 from .evidence import Evidence, ReportFile, ReportsState, StoreState
 from .plan import PlanState, parse_plan
 from .report import render_report
@@ -79,6 +82,32 @@ def build_parser() -> argparse.ArgumentParser:
         "--test-plan",
         metavar="PLAN.json",
         help="the human's test plan, consumed and prioritized, never run (absent = not consulted)",
+    )
+    annotate = sub.add_parser(
+        "annotate",
+        help="record a Change's outcome onto its report and append the Change Record",
+    )
+    annotate.add_argument(
+        "report", metavar="REPORT.md", help="the Impact Report to annotate in place"
+    )
+    annotate.add_argument(
+        "--change",
+        metavar="CHANGE.json",
+        required=True,
+        help="the Change record (a JSON file)",
+    )
+    annotate.add_argument(
+        "--outcome",
+        metavar="OUTCOME",
+        required=True,
+        choices=list(OUTCOMES),
+        help="the human's outcome on the Change",
+    )
+    annotate.add_argument(
+        "--history-path",
+        metavar="PATH",
+        default="impact/memory/changes.jsonl",
+        help="the Change History store (default: impact/memory/changes.jsonl)",
     )
     return parser
 
@@ -185,9 +214,41 @@ def _plan_state(path: str | None) -> PlanState:
     return PlanState(str(plan_path), items=parse_plan(data))
 
 
+def _annotate(args: argparse.Namespace) -> int:
+    """The human's loop: record the outcome onto the report, append the record.
+
+    The Change History gets the Change Record line first — the store
+    is what future assessments grade from — then the report gets the
+    outcome section in place (the human's words, no markers). The
+    parse and the report checks come first, so a bad input or an
+    already-annotated report writes nothing.
+    """
+    with open(args.change, encoding="utf-8") as fh:
+        change = parse_change(json.load(fh))
+    report_path = Path(args.report)
+    if not report_path.exists():  # append mode would create one silently
+        raise FileNotFoundError(f"{args.report} does not exist")
+    if "## Outcome" in report_path.read_text(encoding="utf-8"):
+        raise ValueError(f"{args.report} already carries an Outcome")
+    store = Path(args.history_path)
+    store.parent.mkdir(parents=True, exist_ok=True)
+    record = {"change": to_record(change), "outcome": args.outcome}
+    with store.open("a", encoding="utf-8") as fh:
+        fh.write(json.dumps(record) + "\n")
+    with report_path.open("a", encoding="utf-8") as fh:
+        fh.write(f"\n## Outcome\n\n- **Verdict:** **{args.outcome}**\n")
+    print(
+        f"annotated {args.report} as {args.outcome}; "
+        f"Change Record appended to {args.history_path}"
+    )
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     try:
+        if args.command == "annotate":
+            return _annotate(args)
         with open(args.change, encoding="utf-8") as fh:
             change = parse_change(json.load(fh))
         evidence = Evidence(

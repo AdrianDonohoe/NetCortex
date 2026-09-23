@@ -114,13 +114,14 @@ def _evidence(**overrides):
     return Evidence(**{**defaults, **overrides})
 
 
-def test_grade_reads_a_failure_out_of_the_history_store():
+@pytest.mark.parametrize("outcome", ["rejected", "rolled-back"])
+def test_grade_reads_a_failure_out_of_the_history_store(outcome):
     change = parse_change(json.loads(UPGRADE_JSON))
     history = StoreState(
         "changes.jsonl",
         (
             '{"change": {"type": "upgrade", "nf": "SMF", "from": "1.0", '
-            '"to": "1.1"}, "outcome": "failed"}',
+            '"to": "1.1"}, "outcome": "' + outcome + '"}',
         ),
     )
     rubric = grade(change, _evidence(history=history))
@@ -129,6 +130,22 @@ def test_grade_reads_a_failure_out_of_the_history_store():
     assert factor.name == "historical evidence"
     assert "failed" in factor.finding
     assert factor.citation == "changes.jsonl:1"
+
+
+def test_grade_an_applied_record_is_not_a_failure_match():
+    change = parse_change(json.loads(UPGRADE_JSON))
+    history = StoreState(
+        "changes.jsonl",
+        (
+            '{"change": {"type": "upgrade", "nf": "SMF", "from": "1.0", '
+            '"to": "1.1"}, "outcome": "applied"}',
+        ),
+    )
+    rubric = grade(change, _evidence(history=history))
+    assert rubric.grade is RiskGrade.INSUFFICIENT_EVIDENCE
+    factor = rubric.factors[0]
+    assert factor.name == "historical evidence"
+    assert "no failed Change Records in Change History" in factor.finding
 
 
 def test_grade_finds_nothing_in_empty_stores():

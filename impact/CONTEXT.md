@@ -25,10 +25,17 @@ _Avoid_: patch, request, ticket
 
 **Change Record**:
 The stored form of a Change: the Impact Report annotated with the
-human's outcome (applied / rejected / rolled back) after the fact.
+human's outcome (applied / rejected / rolled-back) after the fact.
 Written only by the human loop — the agent never writes its own
 history.
 _Avoid_: change log entry, history item
+
+**Outcome**:
+The human's after-the-fact word on a Change: applied, rejected, or
+rolled-back. Rejected and rolled-back are failed outcomes — a new
+Change matching a past failed record (same target, same class)
+grades HIGH through the historical-evidence factor.
+_Avoid_: result, status
 
 **Change History**:
 The store of Change Records (`impact/memory/changes.jsonl`). Starts

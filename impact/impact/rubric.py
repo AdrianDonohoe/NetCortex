@@ -15,7 +15,7 @@ from dataclasses import dataclass
 from enum import Enum
 
 from .capture import blast_radius
-from .change import Change, ChangeType
+from .change import FAILED_OUTCOMES, Change, ChangeType
 from .criticality import capture_hits, specgraph_hits
 from .evidence import (
     Evidence,
@@ -115,7 +115,7 @@ def _assess_history(
             if (
                 entry.type is change.type
                 and entry.target == target
-                and outcome == "failed"
+                and outcome in FAILED_OUTCOMES
             ):
                 return (
                     HistoricalSignal.FAILURE_MATCH,

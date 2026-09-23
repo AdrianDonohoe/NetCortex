@@ -216,9 +216,9 @@ def test_corrupt_store_lines_are_skipped_not_fatal(tmp_path):
     assert "inc-smf-junk" not in proc.stdout
 
 
-def test_success_record_keeps_evidence_insufficient(tmp_path):
+def test_applied_record_keeps_evidence_insufficient(tmp_path):
     history = tmp_path / "changes.jsonl"
-    history.write_text(json.dumps({"change": UPGRADE, "outcome": "success"}) + "\n")
+    history.write_text(json.dumps({"change": UPGRADE, "outcome": "applied"}) + "\n")
     proc = _assess(tmp_path, UPGRADE, "--history-path", str(history))
     assert proc.returncode == 0, proc.stderr
     assert "## CHANGE RISK: INSUFFICIENT EVIDENCE" in proc.stdout
