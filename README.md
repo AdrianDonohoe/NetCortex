@@ -25,6 +25,23 @@ hosted on GitHub Pages from [`demo/index.html`](demo/index.html). The
 diagram's source of truth is
 [`dispatch/docs/diagrams/pipeline.json`](dispatch/docs/diagrams/pipeline.json).
 
+## The impact advisory
+
+![impact — pre-change advisory, end to end](impact/docs/diagrams/impact-flow.png)
+
+Before a Change lands: a proposed NF upgrade or config change is
+assessed read-only against the platform's evidence — the episode
+stores, the Change History, prior captures' dependency structure, the
+3GPP specgraph, and an optional human test plan — and graded HIGH,
+MEDIUM, LOW, or INSUFFICIENT EVIDENCE by a fixed rubric whose every
+factor is cited in the report. The Impact Report ends with pre-checks
+and rollback criteria; a human decides and applies, then records the
+Outcome — applied, rejected, or rolled-back — through the annotation
+loop, which alone writes the Change History. A new Change matching a
+past failed record grades HIGH. See
+[`impact/README.md`](impact/README.md); the diagram's source of truth
+is [`impact/docs/diagrams/impact-flow.json`](impact/docs/diagrams/impact-flow.json).
+
 ## Layout
 
 - [`5gcap/`](5gcap/) — the analyzer itself (`5gcap analyze <file.pcap>`),
@@ -51,11 +68,20 @@ diagram's source of truth is
   at a Human approval gate. A real end-to-end
   [`sample Incident Record`](dispatch/docs/sample-incident-record.md) is
   committed. See [`dispatch/README.md`](dispatch/README.md).
+- [`impact/`](impact/) — pre-change advisory over the stack: a proposed
+  Change (NF upgrade or config change) is assessed read-only against the
+  platform's evidence — episode stores, the Change History, captures,
+  the specgraph, an optional human test plan — and graded by a fixed
+  cited rubric into an Impact Report with pre-checks and rollback
+  criteria. A human decides and applies, then records the Outcome
+  through the annotation loop that alone writes the Change History.
+  See [`impact/README.md`](impact/README.md).
 - [`CONTEXT.md`](CONTEXT.md) — 5gcap domain glossary (Capture, Flow,
   Procedure, KPI, Partial Flow); [`triage/CONTEXT.md`](triage/CONTEXT.md) —
   triage domain glossary; [`dispatch/CONTEXT.md`](dispatch/CONTEXT.md) —
-  dispatch domain glossary. [`CONTEXT-MAP.md`](CONTEXT-MAP.md) maps the
-  three contexts and their relationships.
+  dispatch domain glossary; [`impact/CONTEXT.md`](impact/CONTEXT.md) —
+  impact domain glossary. [`CONTEXT-MAP.md`](CONTEXT-MAP.md) maps the
+  four contexts and their relationships.
 - [`docs/adr/`](docs/adr/) — architecture decision records.
 - Diagrams — [`docs/diagrams/`](docs/diagrams/) holds the 5gcap pipeline
   diagram from the Medium article (fireworks-tech-graph IR + rendered
@@ -68,14 +94,17 @@ diagram's source of truth is
   with the same recipe in its
   [`README`](dispatch/docs/diagrams/README.md); and
   [`triage/docs/diagrams/`](triage/docs/diagrams/) holds the triage
-  invocation-flow diagram (IR + SVG).
+  invocation-flow diagram (IR + SVG);
+  [`impact/docs/diagrams/`](impact/docs/diagrams/) holds the impact
+  advisory-flow diagram (IR + SVG + PNG) with the same recipe in its
+  [`README`](impact/docs/diagrams/README.md).
 
 ## Roadmap
 
-Planned as sibling projects on this platform: a **Change Impact Agent**, a
-**Cross-Domain Incident Correlation** project, and a **Digital Twin** —
-each will land as its own top-level directory alongside `5gcap/`,
-`triage/`, and `dispatch/`.
+Planned as sibling projects on this platform: a **Cross-Domain Incident
+Correlation** project and a **Digital Twin** — each will land as its
+own top-level directory alongside `5gcap/`, `triage/`, `dispatch/`,
+and `impact/`.
 
 ## Development
 
@@ -93,6 +122,12 @@ uv run pytest
 
 ```
 cd dispatch
+uv sync
+uv run pytest
+```
+
+```
+cd impact
 uv sync
 uv run pytest
 ```

@@ -1,7 +1,7 @@
 # Context Map
 
 **NetCortex** is the platform — an agentic AI platform for autonomous
-network operations. The three current contexts:
+network operations. The four current contexts:
 
 ## Contexts
 

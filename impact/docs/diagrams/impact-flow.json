@@ -1,0 +1,294 @@
+{
+ "schema_version": 1,
+ "mode": "agent",
+ "template_type": "agent",
+ "style": 2,
+ "width": 1080,
+ "height": 860,
+ "title": "impact — pre-change advisory, end to end",
+ "subtitle": "assess · human decides · annotate · learn",
+ "window_controls": true,
+ "meta_center": "IMPACT · PRE-CHANGE ADVISORY",
+ "meta_right": "STYLE-2 · DARK TERMINAL",
+ "containers": [
+  {
+   "id": "assess",
+   "x": 30,
+   "y": 80,
+   "width": 1020,
+   "height": 300,
+   "label": "Assess — the Change Impact Agent (read-only)"
+  },
+  {
+   "id": "human",
+   "x": 30,
+   "y": 400,
+   "width": 1020,
+   "height": 130,
+   "label": "The human decides"
+  },
+  {
+   "id": "loop",
+   "x": 30,
+   "y": 550,
+   "width": 1020,
+   "height": 240,
+   "label": "Memory + the annotation loop"
+  }
+ ],
+ "nodes": [
+  {
+   "id": "triage_episodes",
+   "kind": "cylinder",
+   "x": 93,
+   "y": 120,
+   "width": 144,
+   "height": 52,
+   "label": "triage episodes",
+   "fill": "#3f2a00",
+   "stroke": "#f59e0b"
+  },
+  {
+   "id": "dispatch_episodes",
+   "kind": "cylinder",
+   "x": 249,
+   "y": 120,
+   "width": 144,
+   "height": 52,
+   "label": "dispatch episodes",
+   "fill": "#3f2a00",
+   "stroke": "#f59e0b"
+  },
+  {
+   "id": "reports",
+   "kind": "folder",
+   "x": 405,
+   "y": 120,
+   "width": 144,
+   "height": 52,
+   "label": "incident reports",
+   "fill": "#3f2a00",
+   "stroke": "#f59e0b"
+  },
+  {
+   "id": "captures",
+   "kind": "folder",
+   "x": 561,
+   "y": 120,
+   "width": 144,
+   "height": 52,
+   "label": "captures",
+   "fill": "#3f2a00",
+   "stroke": "#f59e0b"
+  },
+  {
+   "id": "specgraph",
+   "kind": "folder",
+   "x": 717,
+   "y": 120,
+   "width": 144,
+   "height": 52,
+   "label": "specgraph",
+   "fill": "#3f2a00",
+   "stroke": "#f59e0b"
+  },
+  {
+   "id": "plan",
+   "kind": "folder",
+   "x": 873,
+   "y": 120,
+   "width": 144,
+   "height": 52,
+   "label": "test plan",
+   "fill": "#3f2a00",
+   "stroke": "#f59e0b"
+  },
+  {
+   "id": "change",
+   "kind": "speech",
+   "x": 80,
+   "y": 240,
+   "width": 170,
+   "height": 56,
+   "label": "Change JSON",
+   "sublabel": "upgrade · config",
+   "fill": "#0f172a",
+   "stroke": "#38bdf8"
+  },
+  {
+   "id": "agent",
+   "kind": "double_rect",
+   "x": 400,
+   "y": 232,
+   "width": 360,
+   "height": 64,
+   "label": "assess — read-only",
+   "sublabel": "rubric: history · criticality · blast radius",
+   "fill": "#111827",
+   "stroke": "#a855f7"
+  },
+  {
+   "id": "report",
+   "kind": "folder",
+   "x": 850,
+   "y": 240,
+   "width": 170,
+   "height": 56,
+   "label": "Impact Report",
+   "sublabel": "cited risk grade",
+   "fill": "#3f2a00",
+   "stroke": "#f59e0b"
+  },
+  {
+   "id": "operator",
+   "kind": "rect",
+   "x": 460,
+   "y": 450,
+   "width": 180,
+   "height": 56,
+   "label": "Human",
+   "sublabel": "reads · decides · applies",
+   "fill": "#111827",
+   "stroke": "#34d399"
+  },
+  {
+   "id": "annotate",
+   "kind": "rect",
+   "x": 560,
+   "y": 610,
+   "width": 300,
+   "height": 56,
+   "label": "annotate",
+   "sublabel": "records the Outcome · appends the Change Record",
+   "fill": "#111827",
+   "stroke": "#f97316"
+  },
+  {
+   "id": "change_history",
+   "kind": "cylinder",
+   "x": 80,
+   "y": 610,
+   "width": 300,
+   "height": 56,
+   "label": "Change History",
+   "sublabel": "impact/memory/changes.jsonl · starts empty",
+   "fill": "#3f2a00",
+   "stroke": "#f59e0b"
+  }
+ ],
+ "arrows": [
+  {
+   "id": "a1",
+   "source": "change",
+   "target": "agent",
+   "source_port": "right",
+   "target_port": "left",
+   "flow": "data",
+   "label": "read"
+  },
+  {
+   "id": "a2",
+   "source": "triage_episodes",
+   "target": "agent",
+   "source_port": "bottom",
+   "target_port": "top",
+   "flow": "data"
+  },
+  {
+   "id": "a3",
+   "source": "dispatch_episodes",
+   "target": "agent",
+   "source_port": "bottom",
+   "target_port": "top",
+   "flow": "data"
+  },
+  {
+   "id": "a4",
+   "source": "reports",
+   "target": "agent",
+   "source_port": "bottom",
+   "target_port": "top",
+   "flow": "data"
+  },
+  {
+   "id": "a5",
+   "source": "captures",
+   "target": "agent",
+   "source_port": "bottom",
+   "target_port": "top",
+   "flow": "data"
+  },
+  {
+   "id": "a6",
+   "source": "specgraph",
+   "target": "agent",
+   "source_port": "bottom",
+   "target_port": "top",
+   "flow": "data"
+  },
+  {
+   "id": "a7",
+   "source": "plan",
+   "target": "agent",
+   "source_port": "bottom",
+   "target_port": "top",
+   "flow": "data"
+  },
+  {
+   "id": "a8",
+   "source": "agent",
+   "target": "report",
+   "source_port": "right",
+   "target_port": "left",
+   "flow": "write",
+   "label": "write"
+  },
+  {
+   "id": "a9",
+   "source": "report",
+   "target": "operator",
+   "source_port": "bottom",
+   "target_port": "top",
+   "flow": "data"
+  },
+  {
+   "id": "a10",
+   "source": "operator",
+   "target": "annotate",
+   "source_port": "bottom",
+   "target_port": "top",
+   "flow": "control"
+  },
+  {
+   "id": "a11",
+   "source": "annotate",
+   "target": "change_history",
+   "source_port": "left",
+   "target_port": "right",
+   "flow": "write",
+   "label": "append record"
+  },
+  {
+   "id": "a12",
+   "source": "annotate",
+   "target": "report",
+   "source_port": "right",
+   "target_port": "right",
+   "flow": "write",
+   "label": "record the Outcome"
+  },
+  {
+   "id": "a13",
+   "source": "change_history",
+   "target": "agent",
+   "source_port": "left",
+   "target_port": "left",
+   "flow": "feedback",
+   "label": "a failed record grades HIGH"
+  }
+ ],
+ "composition": {
+  "profile": "standard",
+  "max_bridged_crossings": 9
+ }
+}
