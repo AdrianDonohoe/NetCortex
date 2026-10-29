@@ -5,7 +5,7 @@ description = "LLM-agent root-cause hypothesis generation for failed 5G Registra
 requires-python = ">=3.12"
 dependencies = [
     "dspy>=3.3.0",
-    "fastembed>=0.8.0",
+    "fastembed>=0.9.1",
     "langsmith>=0.3.0",
     "pydantic>=2.13.4",
 ]
