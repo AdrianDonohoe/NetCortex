@@ -28,7 +28,7 @@ pythonpath = ["."]
 
 [dependency-groups]
 dev = [
-    "pytest>=9.1.1",
+    "pytest>=9.2.0",
     # scripts/build_corpus.py (3GPP spec corpus build, one-time step)
     "python-docx>=1.1.0",
 ]
